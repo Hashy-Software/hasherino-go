@@ -41,3 +41,55 @@ func (hc *HasherinoController) AddAccount(id string, login string, token string)
 		return nil
 	})
 }
+
+func (hc *HasherinoController) RemoveAccount(id string) error {
+	return hc.memDB.Delete(&Account{}, "Id = ?", id).Error
+}
+
+func (hc *HasherinoController) GetAccounts() ([]*Account, error) {
+	accounts := []*Account{}
+	result := hc.memDB.Find(&accounts)
+	return accounts, result.Error
+}
+
+func (hc *HasherinoController) SetActiveAccount(id string) error {
+	return hc.memDB.Transaction(func(tx *gorm.DB) error {
+		// Disable every active account(should be just one, but just in case)
+		activeAccounts := []*Account{}
+		result := tx.Find(&activeAccounts, "Active = ?", true)
+		if result.Error != nil {
+			return result.Error
+		}
+		if len(activeAccounts) > 0 {
+			for _, account := range activeAccounts {
+				account.Active = false
+				result = tx.Save(&account)
+				if result.Error != nil {
+					return result.Error
+				}
+			}
+		}
+		// Set account as active
+		account := &Account{}
+		result = tx.Take(&account, "Id = ?", id)
+		if result.Error != nil {
+			return result.Error
+		}
+		account.Active = true
+		result = tx.Save(&account)
+
+		// Commit transation
+		return nil
+	})
+}
+
+func GetActiveAccount(hc *HasherinoController) (*Account, error) {
+	account := &Account{}
+	result := hc.permDB.Take(&account, "Active = ?", true)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return account, nil
+}

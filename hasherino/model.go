@@ -1,14 +1,9 @@
 package hasherino
 
-import (
-	"gorm.io/gorm"
-)
-
 type Account struct {
-	gorm.Model
-	Id     string
-	Login  string
-	Active bool
-	// TODO: enable db encryption
-	Token string
+	Id          string `gorm:"primaryKey"`
+	Login       string
+	DisplayName string
+	Active      bool
+	Token       string // TODO: enable db encryption to hide token
 }
