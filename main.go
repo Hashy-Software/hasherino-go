@@ -28,18 +28,18 @@ func main() {
 			o.(*widget.Label).SetText(data[i])
 		})
 
-	twitchWebsocket := &hasherino_ws.HasherinoWebsocket{}
-	twitchWebsocket, err := twitchWebsocket.New(os.Getenv("TOKEN"), "hash_table")
+	twitchChatWebsocket := &hasherino_ws.TwitchChatWebsocket{}
+	twitchChatWebsocket, err := twitchChatWebsocket.New(os.Getenv("TOKEN"), "hash_table")
 	if err != nil {
 		panic(err)
 	}
-	err = twitchWebsocket.Connect()
+	err = twitchChatWebsocket.Connect()
 	if err != nil {
 		panic(err)
 	}
 
 	go func() {
-		err = twitchWebsocket.Listen(func(message string) {
+		err = twitchChatWebsocket.Listen(func(message string) {
 			println(message)
 			data = append(data, message)
 			messageList.Refresh()
@@ -53,7 +53,7 @@ func main() {
 	components := container.NewBorder(
 		nil,
 		widget.NewButton("Join", func() {
-			twitchWebsocket.Join("hash_table")
+			twitchChatWebsocket.Join("hash_table")
 		}),
 		nil,
 		nil,

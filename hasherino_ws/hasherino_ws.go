@@ -2,7 +2,6 @@ package hasherino_ws
 
 import (
 	"errors"
-	"strings"
 
 	"context"
 	"fmt"
@@ -17,7 +16,7 @@ const (
 	Connected
 )
 
-type HasherinoWebsocket struct {
+type TwitchChatWebsocket struct {
 	url              string
 	state            WebsocketState
 	context          context.Context
@@ -27,7 +26,7 @@ type HasherinoWebsocket struct {
 	channels         map[string]struct{}
 }
 
-func (w *HasherinoWebsocket) New(token string, user string) (*HasherinoWebsocket, error) {
+func (w *TwitchChatWebsocket) New(token string, user string) (*TwitchChatWebsocket, error) {
 	initial_messages := []string{
 		"CAP REQ :twitch.tv/commands twitch.tv/tags",
 		"PASS oauth:" + token,
@@ -40,7 +39,7 @@ func (w *HasherinoWebsocket) New(token string, user string) (*HasherinoWebsocket
 	if err != nil {
 		return nil, err
 	}
-	return &HasherinoWebsocket{
+	return &TwitchChatWebsocket{
 		url:              url,
 		state:            Disconnected,
 		context:          ctx,
@@ -50,7 +49,7 @@ func (w *HasherinoWebsocket) New(token string, user string) (*HasherinoWebsocket
 	}, nil
 }
 
-func (w *HasherinoWebsocket) Connect() error {
+func (w *TwitchChatWebsocket) Connect() error {
 	if w.state != Disconnected {
 		return errors.New("Not disconnected")
 	}
@@ -64,7 +63,7 @@ func (w *HasherinoWebsocket) Connect() error {
 	return nil
 }
 
-func (w *HasherinoWebsocket) Listen(callback func(message string)) error {
+func (w *TwitchChatWebsocket) Listen(callback func(message string)) error {
 	if w.state != Connected {
 		return errors.New("Not connected")
 	}
@@ -80,10 +79,6 @@ func (w *HasherinoWebsocket) Listen(callback func(message string)) error {
 			continue
 		}
 		s := string(content)
-		privmsgIndex := strings.Index(s, "PRIVMSG")
-		if privmsgIndex > -1 {
-			data = append(data, s[privmsgIndex+len("PRIVMSG"):])
-		}
 		fmt.Println("Message: " + s)
 		callback(s)
 	}
@@ -93,7 +88,7 @@ func (w *HasherinoWebsocket) Listen(callback func(message string)) error {
 	return nil
 }
 
-func (w *HasherinoWebsocket) Join(channel string) error {
+func (w *TwitchChatWebsocket) Join(channel string) error {
 	if w.state != Connected {
 		return errors.New("Not connected")
 	}
@@ -105,7 +100,7 @@ func (w *HasherinoWebsocket) Join(channel string) error {
 
 }
 
-func (w *HasherinoWebsocket) Part(channel string) error {
+func (w *TwitchChatWebsocket) Part(channel string) error {
 	if w.state != Connected {
 		return errors.New("Not connected")
 	}
