@@ -6,7 +6,7 @@ import (
 
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-	"github.com/Hashy-Software/hasherino-go/websockets/hasherino_ws"
+	"github.com/Hashy-Software/hasherino-go/hasherino_ws"
 
 	"os"
 )
@@ -28,7 +28,7 @@ func main() {
 			o.(*widget.Label).SetText(data[i])
 		})
 
-	twitchWebsocket := &HasherinoWebsocket{}
+	twitchWebsocket := &hasherino_ws.HasherinoWebsocket{}
 	twitchWebsocket, err := twitchWebsocket.New(os.Getenv("TOKEN"), "hash_table")
 	if err != nil {
 		panic(err)

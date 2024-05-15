@@ -1,3 +1,5 @@
+package hasherino_ws
+
 import (
 	"errors"
 	"strings"
