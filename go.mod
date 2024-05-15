@@ -1,4 +1,4 @@
-module hasherino-go
+module github.com/Hashy-Software/hasherino-go
 
 go 1.22.2
 
