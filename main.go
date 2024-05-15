@@ -6,7 +6,7 @@ import (
 
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-	"github.com/Hashy-Software/hasherino-go/hasherino_websocket"
+	"github.com/Hashy-Software/hasherino-go/websockets/hasherino_ws"
 
 	"os"
 )
