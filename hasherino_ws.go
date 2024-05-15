@@ -1,4 +1,4 @@
-package hasherino_ws
+package hasherino
 
 import (
 	"errors"
