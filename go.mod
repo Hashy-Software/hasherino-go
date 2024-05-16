@@ -4,6 +4,7 @@ go 1.22.2
 
 require (
 	fyne.io/fyne/v2 v2.4.5
+	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	gorm.io/driver/sqlite v1.5.5
 	gorm.io/gorm v1.25.10
 	nhooyr.io/websocket v1.8.11

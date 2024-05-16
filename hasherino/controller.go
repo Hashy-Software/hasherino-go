@@ -8,9 +8,11 @@ import (
 
 // Controlls everything in the app. Called by UI code, making it UI library agnostic.
 type HasherinoController struct {
-	chatWS *TwitchChatWebsocket
-	memDB  *gorm.DB
-	permDB *gorm.DB
+	appId       string
+	twitchOAuth *TwitchOAuth
+	chatWS      *TwitchChatWebsocket
+	memDB       *gorm.DB
+	permDB      *gorm.DB
 }
 
 func (hc *HasherinoController) New() (*HasherinoController, error) {
@@ -24,7 +26,15 @@ func (hc *HasherinoController) New() (*HasherinoController, error) {
 		return nil, err
 	}
 	permDB.AutoMigrate(&Account{})
-	return &HasherinoController{chatWS: chatWS, memDB: memDB, permDB: permDB}, nil
+	c := &HasherinoController{
+		appId:       "hvmj7blkwy2gw3xf820n47i85g4sub",
+		twitchOAuth: NewTwitchOAuth(),
+		chatWS:      chatWS,
+		memDB:       memDB,
+		permDB:      permDB,
+	}
+	go c.twitchOAuth.ListenForOAuthRedirect(c)
+	return c, nil
 }
 
 func (hc *HasherinoController) AddAccount(id string, login string, token string) error {
@@ -83,7 +93,7 @@ func (hc *HasherinoController) SetActiveAccount(id string) error {
 	})
 }
 
-func GetActiveAccount(hc *HasherinoController) (*Account, error) {
+func (hc *HasherinoController) GetActiveAccount() (*Account, error) {
 	account := &Account{}
 	result := hc.permDB.Take(&account, "Active = ?", true)
 
@@ -92,4 +102,8 @@ func GetActiveAccount(hc *HasherinoController) (*Account, error) {
 	}
 
 	return account, nil
+}
+
+func (hc *HasherinoController) OpenOAuthPage() {
+	hc.twitchOAuth.OpenOAuthPage(hc.appId)
 }
