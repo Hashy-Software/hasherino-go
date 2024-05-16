@@ -17,8 +17,9 @@ const (
 )
 
 type TwitchChatWebsocket struct {
+	State WebsocketState
+
 	url              string
-	state            WebsocketState
 	context          context.Context
 	cancel           context.CancelFunc
 	connection       *websocket.Conn
@@ -41,7 +42,7 @@ func (w *TwitchChatWebsocket) New(token string, user string) (*TwitchChatWebsock
 	}
 	return &TwitchChatWebsocket{
 		url:              url,
-		state:            Disconnected,
+		State:            Disconnected,
 		context:          ctx,
 		cancel:           cancel,
 		connection:       c,
@@ -50,7 +51,7 @@ func (w *TwitchChatWebsocket) New(token string, user string) (*TwitchChatWebsock
 }
 
 func (w *TwitchChatWebsocket) Connect() error {
-	if w.state != Disconnected {
+	if w.State != Disconnected {
 		return errors.New("Not disconnected")
 	}
 	for _, msg := range *w.initial_messages {
@@ -59,12 +60,12 @@ func (w *TwitchChatWebsocket) Connect() error {
 			return err
 		}
 	}
-	w.state = Connected
+	w.State = Connected
 	return nil
 }
 
 func (w *TwitchChatWebsocket) Listen(callback func(message string)) error {
-	if w.state != Connected {
+	if w.State != Connected {
 		return errors.New("Not connected")
 	}
 
@@ -89,7 +90,7 @@ func (w *TwitchChatWebsocket) Listen(callback func(message string)) error {
 }
 
 func (w *TwitchChatWebsocket) Join(channel string) error {
-	if w.state != Connected {
+	if w.State != Connected {
 		return errors.New("Not connected")
 	}
 	err := w.connection.Write(w.context, websocket.MessageText, []byte("JOIN #"+channel))
@@ -101,7 +102,7 @@ func (w *TwitchChatWebsocket) Join(channel string) error {
 }
 
 func (w *TwitchChatWebsocket) Part(channel string) error {
-	if w.state != Connected {
+	if w.State != Connected {
 		return errors.New("Not connected")
 	}
 	_, ok := w.channels[channel]

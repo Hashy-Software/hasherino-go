@@ -2,6 +2,8 @@ package hasherino
 
 import (
 	"errors"
+	"log"
+
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -25,7 +27,7 @@ func (hc *HasherinoController) New() (*HasherinoController, error) {
 	if err != nil {
 		return nil, err
 	}
-	permDB.AutoMigrate(&Account{})
+	permDB.AutoMigrate(&Account{}, &Tab{})
 	c := &HasherinoController{
 		appId:       "hvmj7blkwy2gw3xf820n47i85g4sub",
 		twitchOAuth: NewTwitchOAuth(),
@@ -106,4 +108,84 @@ func (hc *HasherinoController) GetActiveAccount() (*Account, error) {
 
 func (hc *HasherinoController) OpenOAuthPage() {
 	hc.twitchOAuth.OpenOAuthPage(hc.appId)
+}
+
+func (hc *HasherinoController) AddTab(channel string) error {
+	err := hc.permDB.Transaction(func(tx *gorm.DB) error {
+		activeAccount := &Account{}
+		result := hc.permDB.Take(&activeAccount, "Active = ?", true)
+		if result.Error != nil {
+			return errors.New("No active account")
+		}
+
+		helix := NewHelix(hc.appId)
+		users, err := helix.GetUsers(activeAccount.Token, []string{channel})
+		if err != nil || len(users.Data) != 1 {
+			return errors.New("Failed to obtain channel's id and login")
+		}
+
+		tab := &Tab{
+			Id:          users.Data[0].ID,
+			Login:       users.Data[0].Login,
+			DisplayName: users.Data[0].DisplayName,
+			Selected:    false,
+		}
+
+		result = tx.Create(&tab)
+
+		err = hc.chatWS.Join(channel)
+		if err != nil {
+			log.Printf("Failed to join channel %s: %s", channel, err)
+			return errors.New("Failed to join channel " + channel)
+		}
+
+		return nil
+	})
+	return err
+}
+
+func (hc *HasherinoController) RemoveTab(id string) error {
+	err := hc.permDB.Transaction(func(tx *gorm.DB) error {
+		tab := &Tab{}
+		result := hc.permDB.Take(&tab, "Id = ?", id)
+		if result.Error != nil {
+			return errors.New("Tab not found for id " + id)
+		}
+
+		err := hc.chatWS.Part(tab.Login)
+		if err != nil {
+			return errors.New("Failed to part channel" + tab.Login)
+		}
+
+		return nil
+	})
+	return err
+}
+
+func (hc *HasherinoController) GetTabs() ([]*Tab, error) {
+	tabs := []*Tab{}
+	result := hc.permDB.Find(&tabs)
+	return tabs, result.Error
+}
+
+func (hc *HasherinoController) Listen(callback func(string)) error {
+	// TODO: parse string here and call each tab's callback with a parsed message object(take a channel-callback map)
+	// Try to find an existing IRC parser
+	activeAccount, err := hc.GetActiveAccount()
+	if err != nil {
+		return err
+	}
+	if hc.chatWS == nil || hc.chatWS.State == Disconnected {
+		hc.chatWS, err = hc.chatWS.New(activeAccount.Token, activeAccount.Login)
+		if err != nil {
+			return err
+		}
+		err = hc.chatWS.Connect()
+		if err != nil {
+			return err
+		}
+	}
+
+	go hc.chatWS.Listen(callback)
+	return nil
 }

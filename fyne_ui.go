@@ -6,25 +6,18 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 
-	// "fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/dialog"
 
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/Hashy-Software/hasherino-go/hasherino"
 
-	"os"
 	"time"
 )
 
 var data = []string{"a"}
 
-// var list_data = [][]string{
-// 	[]string{"top left", "top right"},
-// 	[]string{"bottom left", "bottom right"},
-// }
-
-// func NewSettingsTabs(accounts []*hasherino.Account) *widget.FormItem {
 func NewSettingsTabs(hc *hasherino.HasherinoController) *container.AppTabs {
 	accounts, err := hc.GetAccounts()
 	if err != nil {
@@ -73,7 +66,7 @@ func NewSettingsTabs(hc *hasherino.HasherinoController) *container.AppTabs {
 				hc.OpenOAuthPage()
 			}),
 			widget.NewButton("Remove", func() {
-
+				// TODO
 			}),
 			widget.NewButton("Refresh", func() {
 				accounts, err = hc.GetAccounts()
@@ -93,11 +86,12 @@ func NewSettingsTabs(hc *hasherino.HasherinoController) *container.AppTabs {
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Accounts", box),
 	)
-	// item := widget.NewFormItem("", tabs)
-	// Set item minsize
-	// f := widget.NewForm(item)
-	// f.Resize(fyne.NewSize(200, 300))
 	return tabs
+}
+
+func NewChatTab(name string, msgList *widget.List) *container.TabItem {
+	content := container.NewBorder(nil, nil, nil, nil, msgList)
+	return container.NewTabItem(name, content)
 }
 
 func main() {
@@ -115,50 +109,60 @@ func main() {
 		func(i widget.ListItemID, o fyne.CanvasObject) {
 			o.(*widget.Label).SetText(data[i])
 		})
+	hc := &hasherino.HasherinoController{}
+	hc, err := hc.New()
+	if err != nil {
+		panic(err)
+	}
 
-	twitchChatWebsocket := &hasherino.TwitchChatWebsocket{}
-	twitchChatWebsocket, err := twitchChatWebsocket.New(os.Getenv("TOKEN"), "hash_table")
-	if err != nil {
-		panic(err)
-	}
-	err = twitchChatWebsocket.Connect()
-	if err != nil {
-		panic(err)
-	}
 	i := time.Now()
 
-	go func() {
-		err = twitchChatWebsocket.Listen(func(message string) {
-			println(message)
-			data = append(data, message)
-			if i.Add(time.Second / 2).Before(time.Now()) {
-				i = time.Now()
-				messageList.ScrollToBottom()
-				messageList.Refresh()
-			}
-		})
-		if err != nil {
-			panic(err)
+	hc.Listen(func(message string) {
+		println(message)
+		data = append(data, message)
+		if i.Add(time.Second / 2).Before(time.Now()) {
+			i = time.Now()
+			messageList.ScrollToBottom()
+			messageList.Refresh()
 		}
-	}()
-
-	// message list and buttons container
-	// components := container.NewBorder(
-	// 	nil,
-	// 	widget.NewButton("Join", func() {
-	// 		twitchChatWebsocket.Join("hash_table")
-	// 	}),
-	// 	nil,
-	// 	nil,
-	// 	messageList,
-	// )
-	hc := &hasherino.HasherinoController{}
-	hc, err = hc.New()
-
+	})
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Settings", NewSettingsTabs(hc)),
 	)
-	w.SetContent(tabs)
+	savedTabs, err := hc.GetTabs()
+	if err == nil {
+		for _, tab := range savedTabs {
+			tabs.Append(NewChatTab(tab.DisplayName, messageList))
+		}
+	}
+
+	// message list and buttons container
+	components := container.NewBorder(
+		widget.NewButton("Add tab", func() {
+			entry := widget.NewEntry()
+			entry.SetPlaceHolder("Channel")
+			items := []*widget.FormItem{
+				widget.NewFormItem("New tab", entry),
+			}
+			f := func(b bool) {
+				if b {
+					err := hc.AddTab(entry.Text)
+					if err != nil {
+						dialog.ShowError(err, w)
+					} else {
+						tabs.Append(NewChatTab(entry.Text, messageList))
+					}
+				}
+			}
+			dialog.ShowForm("Add tab", "Add", "Cancel", items, f, w)
+		}),
+		nil,
+		nil,
+		nil,
+		tabs,
+	)
+
+	w.SetContent(components)
 	w.ShowAndRun()
 
 }
