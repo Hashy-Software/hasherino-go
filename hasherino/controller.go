@@ -28,7 +28,7 @@ func (hc *HasherinoController) New() (*HasherinoController, error) {
 }
 
 func (hc *HasherinoController) AddAccount(id string, login string, token string) error {
-	return hc.memDB.Transaction(func(tx *gorm.DB) error {
+	return hc.permDB.Transaction(func(tx *gorm.DB) error {
 		// Get one account, no specific order
 		result := tx.Take(&Account{})
 		// No account exists, so the first one should be active
@@ -43,17 +43,17 @@ func (hc *HasherinoController) AddAccount(id string, login string, token string)
 }
 
 func (hc *HasherinoController) RemoveAccount(id string) error {
-	return hc.memDB.Delete(&Account{}, "Id = ?", id).Error
+	return hc.permDB.Delete(&Account{}, "Id = ?", id).Error
 }
 
 func (hc *HasherinoController) GetAccounts() ([]*Account, error) {
 	accounts := []*Account{}
-	result := hc.memDB.Find(&accounts)
+	result := hc.permDB.Find(&accounts)
 	return accounts, result.Error
 }
 
 func (hc *HasherinoController) SetActiveAccount(id string) error {
-	return hc.memDB.Transaction(func(tx *gorm.DB) error {
+	return hc.permDB.Transaction(func(tx *gorm.DB) error {
 		// Disable every active account(should be just one, but just in case)
 		activeAccounts := []*Account{}
 		result := tx.Find(&activeAccounts, "Active = ?", true)
