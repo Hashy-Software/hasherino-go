@@ -5,6 +5,7 @@ go 1.22.2
 require (
 	fyne.io/fyne/v2 v2.4.5
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
+	gopkg.in/irc.v4 v4.0.0
 	gorm.io/driver/sqlite v1.5.5
 	gorm.io/gorm v1.25.10
 	nhooyr.io/websocket v1.8.11
@@ -39,6 +40,7 @@ require (
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/js/dom v0.0.0-20210725211120-f030747120f2 // indirect

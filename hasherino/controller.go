@@ -3,9 +3,12 @@ package hasherino
 import (
 	"errors"
 	"log"
+	"strings"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
+	"gopkg.in/irc.v4"
 )
 
 // Controlls everything in the app. Called by UI code, making it UI library agnostic.
@@ -186,6 +189,20 @@ func (hc *HasherinoController) Listen(callback func(string)) error {
 		}
 	}
 
-	go hc.chatWS.Listen(callback)
+	my_callback := func(message string) {
+		msg, err := irc.ParseMessage(message)
+		if err != nil {
+			log.Printf("Failed to parse message: %s", err)
+			return
+		}
+		if msg.Command != "PRIVMSG" {
+			return
+		}
+		// channel := msg.Params[0]
+		params := strings.Join(msg.Params[1:], " ")
+		callback(msg.Name + ": " + params)
+	}
+
+	go hc.chatWS.Listen(my_callback)
 	return nil
 }
