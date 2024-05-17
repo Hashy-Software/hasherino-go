@@ -87,7 +87,7 @@ func NewSettingsTabs(hc *hasherino.HasherinoController) *container.AppTabs {
 	return tabs
 }
 
-func NewChatTab(name string) *container.TabItem {
+func NewChatTab(name string, sendMsg func(string) error) *container.TabItem {
 	var data []string = []string{}
 	messageList := widget.NewList(
 		func() int {
@@ -108,7 +108,17 @@ func NewChatTab(name string) *container.TabItem {
 		messageList.ScrollToBottom()
 		messageList.Refresh()
 	}
-	content := container.NewBorder(nil, nil, nil, nil, messageList)
+	msgEntry := widget.NewEntry()
+	msgEntry.SetPlaceHolder("Message")
+	sendButton := widget.NewButton("Send", func() {
+		text := msgEntry.Text
+		err := sendMsg(text)
+		if err == nil {
+			msgEntry.SetText("")
+			data = append(data, "Me: "+text)
+		}
+	})
+	content := container.NewBorder(nil, container.NewHBox(msgEntry, sendButton), nil, nil, messageList)
 	return container.NewTabItem(name, content)
 }
 
@@ -123,13 +133,25 @@ func main() {
 		panic(err)
 	}
 
+	settingsTab := container.NewTabItem("Settings", NewSettingsTabs(hc))
 	tabs := container.NewAppTabs(
-		container.NewTabItem("Settings", NewSettingsTabs(hc)),
+		settingsTab,
 	)
+	tabs.OnSelected = func(tab *container.TabItem) {
+		if tab != settingsTab {
+			hc.SetSelectedTab(tab.Text)
+		}
+	}
+
 	savedTabs, err := hc.GetTabs()
 	if err == nil {
+		selectedTab, err := hc.GetSelectedTab()
 		for _, tab := range savedTabs {
-			tabs.Append(NewChatTab(tab.DisplayName))
+			newTab := NewChatTab(tab.DisplayName, hc.SendMessage)
+			tabs.Append(newTab)
+			if err == nil && selectedTab.DisplayName == tab.DisplayName {
+				tabs.Select(newTab)
+			}
 		}
 	}
 	hc.Listen(callbackMap)
@@ -148,7 +170,7 @@ func main() {
 					if err != nil {
 						dialog.ShowError(err, w)
 					} else {
-						tabs.Append(NewChatTab(entry.Text))
+						tabs.Append(NewChatTab(entry.Text, hc.SendMessage))
 					}
 				}
 			}

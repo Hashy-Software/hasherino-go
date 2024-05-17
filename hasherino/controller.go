@@ -14,6 +14,7 @@ import (
 // Controlls everything in the app. Called by UI code, making it UI library agnostic.
 type HasherinoController struct {
 	appId       string
+	selectedTab string
 	twitchOAuth *TwitchOAuth
 	chatWS      *TwitchChatWebsocket
 	memDB       *gorm.DB
@@ -178,6 +179,42 @@ func (hc *HasherinoController) GetTabs() ([]*Tab, error) {
 	return tabs, result.Error
 }
 
+func (hc *HasherinoController) SetSelectedTab(login string) error {
+	return hc.permDB.Transaction(func(tx *gorm.DB) error {
+		selectedTabs := []*Tab{}
+		result := tx.Find(&selectedTabs, "Selected = ?", true)
+		if result.Error != nil {
+			return result.Error
+		}
+		if len(selectedTabs) > 0 {
+			for _, tab := range selectedTabs {
+				tab.Selected = false
+				result = tx.Save(&tab)
+				if result.Error != nil {
+					return result.Error
+				}
+			}
+		}
+		tab := &Tab{}
+		result = hc.permDB.Take(&tab, "Login = ?", login)
+		if result.Error != nil {
+			return result.Error
+		}
+		tab.Selected = true
+		result = tx.Save(&tab)
+		if result.Error != nil {
+			return result.Error
+		}
+		return nil
+	})
+}
+
+func (hc *HasherinoController) GetSelectedTab() (*Tab, error) {
+	tab := &Tab{}
+	result := hc.permDB.Take(&tab, "Selected = ?", true)
+	return tab, result.Error
+}
+
 func (hc *HasherinoController) Listen(callbackMap map[string]func(ChatMessage)) error {
 	// TODO: parse string here and call each tab's callback with a parsed message object(take a channel-callback map)
 	// Try to find an existing IRC parser
@@ -227,4 +264,10 @@ func (hc *HasherinoController) Listen(callbackMap map[string]func(ChatMessage)) 
 
 	go hc.chatWS.Listen(callbackWrapper)
 	return nil
+}
+
+func (hc *HasherinoController) SendMessage(message string) error {
+	channel := ""
+	err := hc.chatWS.Send(channel, message)
+	return err
 }

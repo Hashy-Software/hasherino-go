@@ -119,3 +119,14 @@ func (w *TwitchChatWebsocket) Part(channel string) error {
 	return nil
 
 }
+
+func (w *TwitchChatWebsocket) Send(channel string, message string) error {
+	if w.State != Connected {
+		return errors.New("Not connected")
+	}
+	err := w.connection.Write(w.context, websocket.MessageText, []byte("PRIVMSG #"+channel+" :"+message))
+	if err != nil {
+		return err
+	}
+	return nil
+}
