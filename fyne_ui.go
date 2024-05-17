@@ -220,7 +220,6 @@ func main() {
 	}
 	hc.Listen()
 
-	// message list and buttons container
 	components := container.NewBorder(
 		widget.NewButton("Add tab", func() {
 			entry := widget.NewEntry()
