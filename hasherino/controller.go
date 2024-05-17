@@ -20,6 +20,13 @@ type HasherinoController struct {
 	permDB      *gorm.DB
 }
 
+type ChatMessage struct {
+	ChannelID string
+	Command   string
+	Author    string
+	Text      string
+}
+
 func (hc *HasherinoController) New() (*HasherinoController, error) {
 	chatWS := &TwitchChatWebsocket{}
 	memDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
@@ -171,7 +178,7 @@ func (hc *HasherinoController) GetTabs() ([]*Tab, error) {
 	return tabs, result.Error
 }
 
-func (hc *HasherinoController) Listen(callback func(string)) error {
+func (hc *HasherinoController) Listen(callbackMap map[string]func(ChatMessage)) error {
 	// TODO: parse string here and call each tab's callback with a parsed message object(take a channel-callback map)
 	// Try to find an existing IRC parser
 	activeAccount, err := hc.GetActiveAccount()
@@ -189,20 +196,35 @@ func (hc *HasherinoController) Listen(callback func(string)) error {
 		}
 	}
 
-	my_callback := func(message string) {
+	callbackWrapper := func(message string) {
 		msg, err := irc.ParseMessage(message)
 		if err != nil {
 			log.Printf("Failed to parse message: %s", err)
 			return
 		}
-		if msg.Command != "PRIVMSG" {
+		channel := ""
+		if len(msg.Params) > 0 {
+			channel = msg.Params[0][1:]
+		}
+		paramsText := ""
+		if len(msg.Params) > 1 {
+			paramsText = strings.Join(msg.Params[1:], " ")
+		}
+		callback, ok := callbackMap[channel]
+		if !ok {
+			log.Printf("No callback for channel %s.", channel)
 			return
 		}
-		// channel := msg.Params[0]
-		params := strings.Join(msg.Params[1:], " ")
-		callback(msg.Name + ": " + params)
+		callback(ChatMessage{ChannelID: channel, Command: msg.Command, Author: msg.Name, Text: paramsText})
 	}
 
-	go hc.chatWS.Listen(my_callback)
+	for channel := range callbackMap {
+		_, joinedChannel := hc.chatWS.channels[channel]
+		if !joinedChannel {
+			hc.chatWS.Join(channel)
+		}
+	}
+
+	go hc.chatWS.Listen(callbackWrapper)
 	return nil
 }

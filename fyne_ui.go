@@ -12,11 +12,9 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/Hashy-Software/hasherino-go/hasherino"
-
-	"time"
 )
 
-var data = []string{"a"}
+var callbackMap = make(map[string]func(hasherino.ChatMessage))
 
 func NewSettingsTabs(hc *hasherino.HasherinoController) *container.AppTabs {
 	accounts, err := hc.GetAccounts()
@@ -89,16 +87,8 @@ func NewSettingsTabs(hc *hasherino.HasherinoController) *container.AppTabs {
 	return tabs
 }
 
-func NewChatTab(name string, msgList *widget.List) *container.TabItem {
-	content := container.NewBorder(nil, nil, nil, nil, msgList)
-	return container.NewTabItem(name, content)
-}
-
-func main() {
-	a := app.New()
-	w := a.NewWindow("hasherino2")
-	w.Resize(fyne.NewSize(400, 600))
-
+func NewChatTab(name string) *container.TabItem {
+	var data []string = []string{}
 	messageList := widget.NewList(
 		func() int {
 			return len(data)
@@ -109,32 +99,40 @@ func main() {
 		func(i widget.ListItemID, o fyne.CanvasObject) {
 			o.(*widget.Label).SetText(data[i])
 		})
+	callbackMap[name] = func(message hasherino.ChatMessage) {
+		if message.Command != "PRIVMSG" {
+			return
+		}
+		text := message.Author + ": " + message.Text
+		data = append(data, text)
+		messageList.ScrollToBottom()
+		messageList.Refresh()
+	}
+	content := container.NewBorder(nil, nil, nil, nil, messageList)
+	return container.NewTabItem(name, content)
+}
+
+func main() {
+	a := app.New()
+	w := a.NewWindow("hasherino2")
+	w.Resize(fyne.NewSize(400, 600))
+
 	hc := &hasherino.HasherinoController{}
 	hc, err := hc.New()
 	if err != nil {
 		panic(err)
 	}
 
-	i := time.Now()
-
-	hc.Listen(func(message string) {
-		println(message)
-		data = append(data, message)
-		if i.Add(time.Second / 2).Before(time.Now()) {
-			i = time.Now()
-			messageList.ScrollToBottom()
-			messageList.Refresh()
-		}
-	})
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Settings", NewSettingsTabs(hc)),
 	)
 	savedTabs, err := hc.GetTabs()
 	if err == nil {
 		for _, tab := range savedTabs {
-			tabs.Append(NewChatTab(tab.DisplayName, messageList))
+			tabs.Append(NewChatTab(tab.DisplayName))
 		}
 	}
+	hc.Listen(callbackMap)
 
 	// message list and buttons container
 	components := container.NewBorder(
@@ -150,7 +148,7 @@ func main() {
 					if err != nil {
 						dialog.ShowError(err, w)
 					} else {
-						tabs.Append(NewChatTab(entry.Text, messageList))
+						tabs.Append(NewChatTab(entry.Text))
 					}
 				}
 			}
