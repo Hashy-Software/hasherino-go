@@ -65,6 +65,12 @@ func (w *TwitchChatWebsocket) Connect() error {
 	return nil
 }
 
+func (w *TwitchChatWebsocket) Close() {
+	w.cancel()
+	w.connection.Close(websocket.StatusNormalClosure, "")
+	w.State = Disconnected
+}
+
 func (w *TwitchChatWebsocket) Listen(callback func(message string)) error {
 	if w.State != Connected {
 		return errors.New("Not connected")

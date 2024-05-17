@@ -175,7 +175,7 @@ func main() {
 	w.Resize(fyne.NewSize(400, 600))
 
 	hc := &hasherino.HasherinoController{}
-	hc, err := hc.New()
+	hc, err := hc.New(callbackMap)
 	if err != nil {
 		panic(err)
 	}
@@ -218,7 +218,7 @@ func main() {
 			}
 		}
 	}
-	hc.Listen(callbackMap)
+	hc.Listen()
 
 	// message list and buttons container
 	components := container.NewBorder(

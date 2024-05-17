@@ -15,6 +15,7 @@ import (
 type HasherinoController struct {
 	appId       string
 	selectedTab string
+	callbackMap map[string]func(ChatMessage)
 	twitchOAuth *TwitchOAuth
 	chatWS      *TwitchChatWebsocket
 	memDB       *gorm.DB
@@ -28,7 +29,7 @@ type ChatMessage struct {
 	Text      string
 }
 
-func (hc *HasherinoController) New() (*HasherinoController, error) {
+func (hc *HasherinoController) New(callbackMap map[string]func(ChatMessage)) (*HasherinoController, error) {
 	chatWS := &TwitchChatWebsocket{}
 	memDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {
@@ -41,6 +42,7 @@ func (hc *HasherinoController) New() (*HasherinoController, error) {
 	permDB.AutoMigrate(&Account{}, &Tab{})
 	c := &HasherinoController{
 		appId:       "hvmj7blkwy2gw3xf820n47i85g4sub",
+		callbackMap: callbackMap,
 		twitchOAuth: NewTwitchOAuth(),
 		chatWS:      chatWS,
 		memDB:       memDB,
@@ -100,6 +102,15 @@ func (hc *HasherinoController) SetActiveAccount(id string) error {
 		}
 		account.Active = true
 		result = tx.Save(&account)
+
+		if result.Error != nil {
+			return result.Error
+		}
+
+		if hc.chatWS != nil {
+			hc.chatWS.Close()
+		}
+		go hc.Listen()
 
 		// Commit transation
 		return nil
@@ -215,7 +226,7 @@ func (hc *HasherinoController) GetSelectedTab() (*Tab, error) {
 	return tab, result.Error
 }
 
-func (hc *HasherinoController) Listen(callbackMap map[string]func(ChatMessage)) error {
+func (hc *HasherinoController) Listen() error {
 	activeAccount, err := hc.GetActiveAccount()
 	if err != nil {
 		return err
@@ -249,7 +260,7 @@ func (hc *HasherinoController) Listen(callbackMap map[string]func(ChatMessage)) 
 		if len(msg.Params) > 1 {
 			paramsText = strings.Join(msg.Params[1:], " ")
 		}
-		callback, ok := callbackMap[channel]
+		callback, ok := hc.callbackMap[channel]
 		if !ok {
 			log.Printf("No callback for channel %s.", channel)
 			return
@@ -257,7 +268,7 @@ func (hc *HasherinoController) Listen(callbackMap map[string]func(ChatMessage)) 
 		callback(ChatMessage{ChannelID: channel, Command: msg.Command, Author: msg.Name, Text: paramsText})
 	}
 
-	for channel := range callbackMap {
+	for channel := range hc.callbackMap {
 		_, joinedChannel := hc.chatWS.channels[channel]
 		if !joinedChannel {
 			hc.chatWS.Join(channel)
