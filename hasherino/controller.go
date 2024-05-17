@@ -3,6 +3,9 @@ package hasherino
 import (
 	"errors"
 	"log"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"gorm.io/driver/sqlite"
@@ -35,7 +38,11 @@ func (hc *HasherinoController) New(callbackMap map[string]func(ChatMessage)) (*H
 	if err != nil {
 		return nil, err
 	}
-	permDB, err := gorm.Open(sqlite.Open("gorm.db"), &gorm.Config{})
+	dataFolder, err := GetDataFolder()
+	if err != nil {
+		return nil, err
+	}
+	permDB, err := gorm.Open(sqlite.Open(filepath.Join(dataFolder, "gorm.db")), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -322,4 +329,19 @@ func (hc *HasherinoController) GetSettings() (*AppSettings, error) {
 
 func (hc *HasherinoController) SetSettings(appSettings *AppSettings) error {
 	return hc.permDB.Save(appSettings).Error
+}
+
+func GetDataFolder() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	switch runtime.GOOS {
+	case "windows":
+		return filepath.Join(home, "AppData", "Local", "Hasherino"), nil
+	case "linux":
+		return filepath.Join(home, ".local", "share", "hasherino"), nil
+	default:
+		return home, nil
+	}
 }
