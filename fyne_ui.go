@@ -266,24 +266,44 @@ func main() {
 	hc.Listen()
 
 	components := container.NewBorder(
-		widget.NewButton("Add tab", func() {
-			entry := widget.NewEntry()
-			entry.SetPlaceHolder("Channel")
-			items := []*widget.FormItem{
-				widget.NewFormItem("New tab", entry),
-			}
-			f := func(b bool) {
-				if b {
-					err := hc.AddTab(entry.Text)
-					if err != nil {
-						dialog.ShowError(err, w)
-					} else {
-						tabs.Append(NewChatTab(entry.Text, sendMessage, w, hc.GetSettings))
+		container.NewHBox(
+			widget.NewButton("Add tab", func() {
+				entry := widget.NewEntry()
+				entry.SetPlaceHolder("Channel")
+				items := []*widget.FormItem{
+					widget.NewFormItem("New tab", entry),
+				}
+				f := func(b bool) {
+					if b {
+						err := hc.AddTab(entry.Text)
+						if err != nil {
+							dialog.ShowError(err, w)
+						} else {
+							tabs.Append(NewChatTab(entry.Text, sendMessage, w, hc.GetSettings))
+						}
 					}
 				}
-			}
-			dialog.ShowForm("Add tab", "Add", "Cancel", items, f, w)
-		}),
+				dialog.ShowForm("Add tab", "Add", "Cancel", items, f, w)
+			}),
+			widget.NewButton("Close tab", func() {
+				if tabs.Selected() == settingsTab {
+					dialog.ShowError(errors.New("Cannot close settings tab"), w)
+					return
+				}
+				tab, err := hc.GetSelectedTab()
+				if err != nil {
+					dialog.ShowError(err, w)
+					return
+				}
+				err = hc.RemoveTab(tab.Id)
+				if err != nil {
+					dialog.ShowError(err, w)
+					return
+				}
+				tabs.Remove(tabs.Selected())
+			}),
+		),
+
 		nil,
 		nil,
 		nil,
