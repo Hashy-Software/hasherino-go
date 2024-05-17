@@ -57,6 +57,12 @@ func NewSettingsTabs(hc *hasherino.HasherinoController) *container.AppTabs {
 			o.(*widget.Label).SetText("Active")
 		}
 	}
+	var selectedAccount *hasherino.Account
+	table.OnSelected = func(id widget.TableCellID) {
+		if id.Row >= 0 {
+			selectedAccount = accounts[id.Row]
+		}
+	}
 
 	box := container.NewBorder(
 		nil,
@@ -65,7 +71,14 @@ func NewSettingsTabs(hc *hasherino.HasherinoController) *container.AppTabs {
 				hc.OpenOAuthPage()
 			}),
 			widget.NewButton("Remove", func() {
-				// TODO
+				if selectedAccount != nil {
+					hc.RemoveAccount(selectedAccount.Id)
+					accounts, err = hc.GetAccounts()
+					if err != nil {
+						log.Println(err)
+					}
+					table.Refresh()
+				}
 			}),
 			widget.NewButton("Refresh", func() {
 				accounts, err = hc.GetAccounts()
@@ -186,9 +199,9 @@ func main() {
 	if err == nil {
 		selectedTab, err := hc.GetSelectedTab()
 		for _, tab := range savedTabs {
-			newTab := NewChatTab(tab.DisplayName, sendMessage, w)
+			newTab := NewChatTab(tab.Login, sendMessage, w)
 			tabs.Append(newTab)
-			if err == nil && selectedTab.DisplayName == tab.DisplayName {
+			if err == nil && selectedTab.Login == tab.Login {
 				tabs.Select(newTab)
 			}
 		}
