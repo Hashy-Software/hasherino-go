@@ -103,7 +103,6 @@ func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *containe
 				table.Refresh()
 			}),
 		),
-
 		nil,
 		nil,
 		table,
@@ -133,6 +132,10 @@ func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *containe
 	}
 	generalBox := container.NewVBox(
 		container.NewHBox(widget.NewLabel("Chat message limit"), layout.NewSpacer(), chatLimitEntry),
+		widget.NewLabel(""),
+		widget.NewLabel(""),
+		widget.NewLabel(""),
+		widget.NewLabel(""),
 	)
 
 	// Tabs
@@ -225,15 +228,10 @@ func main() {
 		panic(err)
 	}
 
-	settingsTab := container.NewTabItem("Settings", NewSettingsTabs(hc, w))
-	tabs := container.NewAppTabs(
-		settingsTab,
-	)
-	tabs.OnSelected = func(tab *container.TabItem) {
-		if tab != settingsTab {
-			hc.SetSelectedTab(tab.Text)
-			tabs.Refresh()
-		}
+	chatTabs := container.NewAppTabs()
+	chatTabs.OnSelected = func(tab *container.TabItem) {
+		hc.SetSelectedTab(tab.Text)
+		chatTabs.Refresh()
 	}
 
 	sendMessage := func(message string) (string, error) {
@@ -257,9 +255,9 @@ func main() {
 		selectedTab, err := hc.GetSelectedTab()
 		for _, tab := range savedTabs {
 			newTab := NewChatTab(tab.Login, sendMessage, w, hc.GetSettings)
-			tabs.Append(newTab)
+			chatTabs.Append(newTab)
 			if err == nil && selectedTab.Login == tab.Login {
-				tabs.Select(newTab)
+				chatTabs.Select(newTab)
 			}
 		}
 	}
@@ -267,6 +265,9 @@ func main() {
 
 	components := container.NewBorder(
 		container.NewHBox(
+			widget.NewButton("Settings", func() {
+				dialog.ShowCustom("Settings", "Close", container.NewBorder(nil, nil, nil, nil, NewSettingsTabs(hc, w)), w)
+			}),
 			widget.NewButton("Add tab", func() {
 				entry := widget.NewEntry()
 				entry.SetPlaceHolder("Channel")
@@ -279,17 +280,13 @@ func main() {
 						if err != nil {
 							dialog.ShowError(err, w)
 						} else {
-							tabs.Append(NewChatTab(entry.Text, sendMessage, w, hc.GetSettings))
+							chatTabs.Append(NewChatTab(entry.Text, sendMessage, w, hc.GetSettings))
 						}
 					}
 				}
 				dialog.ShowForm("Add tab", "Add", "Cancel", items, f, w)
 			}),
 			widget.NewButton("Close tab", func() {
-				if tabs.Selected() == settingsTab {
-					dialog.ShowError(errors.New("Cannot close settings tab"), w)
-					return
-				}
 				tab, err := hc.GetSelectedTab()
 				if err != nil {
 					dialog.ShowError(err, w)
@@ -300,14 +297,14 @@ func main() {
 					dialog.ShowError(err, w)
 					return
 				}
-				tabs.Remove(tabs.Selected())
+				chatTabs.Remove(chatTabs.Selected())
 			}),
 		),
 
 		nil,
 		nil,
 		nil,
-		tabs,
+		chatTabs,
 	)
 
 	w.SetContent(components)
