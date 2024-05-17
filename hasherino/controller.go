@@ -39,7 +39,7 @@ func (hc *HasherinoController) New(callbackMap map[string]func(ChatMessage)) (*H
 	if err != nil {
 		return nil, err
 	}
-	permDB.AutoMigrate(&Account{}, &Tab{})
+	permDB.AutoMigrate(&Account{}, &Tab{}, &AppSettings{})
 	c := &HasherinoController{
 		appId:       "hvmj7blkwy2gw3xf820n47i85g4sub",
 		callbackMap: callbackMap,
@@ -47,6 +47,13 @@ func (hc *HasherinoController) New(callbackMap map[string]func(ChatMessage)) (*H
 		chatWS:      chatWS,
 		memDB:       memDB,
 		permDB:      permDB,
+	}
+	settings := &AppSettings{}
+	result := permDB.Take(settings)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		result = permDB.Create(&AppSettings{ChatMessageLimit: 100})
+	} else if result.Error != nil {
+		return nil, err
 	}
 	go c.twitchOAuth.ListenForOAuthRedirect(c)
 	return c, nil
@@ -305,4 +312,14 @@ func (hc *HasherinoController) IsChannelJoined(channel string) bool {
 func (hc *HasherinoController) SendMessage(channel string, message string) error {
 	err := hc.chatWS.Send(channel, message)
 	return err
+}
+
+func (hc *HasherinoController) GetSettings() (*AppSettings, error) {
+	appSettings := &AppSettings{}
+	result := hc.permDB.Take(appSettings)
+	return appSettings, result.Error
+}
+
+func (hc *HasherinoController) SetSettings(appSettings *AppSettings) error {
+	return hc.permDB.Save(appSettings).Error
 }

@@ -1,5 +1,7 @@
 package hasherino
 
+import "gorm.io/gorm"
+
 type Account struct {
 	Id          string `gorm:"primaryKey"`
 	Login       string
@@ -13,4 +15,10 @@ type Tab struct {
 	Login       string
 	DisplayName string
 	Selected    bool
+}
+
+// Single row table for global settings
+type AppSettings struct {
+	gorm.Model
+	ChatMessageLimit int // Maximum amount of messages in a single chat
 }

@@ -3,9 +3,11 @@ package main
 import (
 	"errors"
 	"log"
+	"strconv"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/layout"
 
 	"fyne.io/fyne/v2/dialog"
 
@@ -18,6 +20,7 @@ import (
 var callbackMap = make(map[string]func(hasherino.ChatMessage))
 
 func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *container.AppTabs {
+	// Accounts tab
 	accounts, err := hc.GetAccounts()
 	if err != nil {
 		panic(err)
@@ -64,7 +67,7 @@ func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *containe
 		}
 	}
 
-	box := container.NewBorder(
+	accountsBox := container.NewBorder(
 		nil,
 		container.NewHBox(
 			widget.NewButton("Add", func() {
@@ -105,15 +108,47 @@ func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *containe
 		nil,
 		table,
 	)
-	box.Add(table)
+	accountsBox.Add(table)
 
+	// General tab
+	chatLimitEntry := widget.NewEntry()
+	settings, err := hc.GetSettings()
+	if err != nil {
+		panic(err)
+	}
+	chatLimitEntry.SetText(strconv.Itoa(settings.ChatMessageLimit))
+	chatLimitEntry.Validator = func(s string) error {
+		_, err := strconv.Atoi(s)
+		return err
+	}
+	chatLimitEntry.OnChanged = func(s string) {
+		settings.ChatMessageLimit, err = strconv.Atoi(s)
+		if err != nil {
+			log.Println(err)
+		}
+		err = hc.SetSettings(settings)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	generalBox := container.NewVBox(
+		container.NewHBox(widget.NewLabel("Chat message limit"), layout.NewSpacer(), chatLimitEntry),
+	)
+
+	// Tabs
 	tabs := container.NewAppTabs(
-		container.NewTabItem("Accounts", box),
+		container.NewTabItem("General", generalBox),
+		container.NewTabItem("Accounts", accountsBox),
 	)
 	return tabs
 }
 
-func NewChatTab(name string, sendMsg func(string) (string, error), w fyne.Window) *container.TabItem {
+func NewChatTab(
+	name string,
+	sendMsg func(string) (string, error),
+	window fyne.Window,
+	settingsFunc func() (*hasherino.AppSettings, error),
+) *container.TabItem {
 	var data []string = []string{}
 	messageList := widget.NewList(
 		func() int {
@@ -130,7 +165,17 @@ func NewChatTab(name string, sendMsg func(string) (string, error), w fyne.Window
 			return
 		}
 		text := message.Author + ": " + message.Text
-		data = append(data, text)
+
+		settings, err := settingsFunc()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		if len(data) >= settings.ChatMessageLimit {
+			data = append(data[1:], text)
+		} else {
+			data = append(data, text)
+		}
 		messageList.ScrollToBottom()
 		messageList.Refresh()
 	}
@@ -147,13 +192,13 @@ func NewChatTab(name string, sendMsg func(string) (string, error), w fyne.Window
 
 		err := msgEntry.Validate()
 		if err != nil {
-			dialog.ShowError(err, w)
+			dialog.ShowError(err, window)
 			return
 		}
 
 		author, err := sendMsg(text)
 		if err != nil {
-			dialog.ShowError(err, w)
+			dialog.ShowError(err, window)
 			return
 		}
 
@@ -211,7 +256,7 @@ func main() {
 	if err == nil {
 		selectedTab, err := hc.GetSelectedTab()
 		for _, tab := range savedTabs {
-			newTab := NewChatTab(tab.Login, sendMessage, w)
+			newTab := NewChatTab(tab.Login, sendMessage, w, hc.GetSettings)
 			tabs.Append(newTab)
 			if err == nil && selectedTab.Login == tab.Login {
 				tabs.Select(newTab)
@@ -233,7 +278,7 @@ func main() {
 					if err != nil {
 						dialog.ShowError(err, w)
 					} else {
-						tabs.Append(NewChatTab(entry.Text, sendMessage, w))
+						tabs.Append(NewChatTab(entry.Text, sendMessage, w, hc.GetSettings))
 					}
 				}
 			}
