@@ -17,7 +17,7 @@ import (
 
 var callbackMap = make(map[string]func(hasherino.ChatMessage))
 
-func NewSettingsTabs(hc *hasherino.HasherinoController) *container.AppTabs {
+func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *container.AppTabs {
 	accounts, err := hc.GetAccounts()
 	if err != nil {
 		panic(err)
@@ -79,6 +79,18 @@ func NewSettingsTabs(hc *hasherino.HasherinoController) *container.AppTabs {
 					}
 					table.Refresh()
 				}
+			}),
+			widget.NewButton("Activate", func() {
+				if selectedAccount == nil {
+					dialog.ShowError(errors.New("No account selected"), w)
+					return
+				}
+				hc.SetActiveAccount(selectedAccount.Id)
+				accounts, err = hc.GetAccounts()
+				if err != nil {
+					log.Println(err)
+				}
+				table.Refresh()
 			}),
 			widget.NewButton("Refresh", func() {
 				accounts, err = hc.GetAccounts()
@@ -168,7 +180,7 @@ func main() {
 		panic(err)
 	}
 
-	settingsTab := container.NewTabItem("Settings", NewSettingsTabs(hc))
+	settingsTab := container.NewTabItem("Settings", NewSettingsTabs(hc, w))
 	tabs := container.NewAppTabs(
 		settingsTab,
 	)
