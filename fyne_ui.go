@@ -88,7 +88,7 @@ func NewSettingsTabs(hc *hasherino.HasherinoController) *container.AppTabs {
 	return tabs
 }
 
-func NewChatTab(name string, sendMsg func(string) error, w fyne.Window, canSendMessage func() bool) *container.TabItem {
+func NewChatTab(name string, sendMsg func(string) (string, error), w fyne.Window) *container.TabItem {
 	var data []string = []string{}
 	messageList := widget.NewList(
 		func() int {
@@ -119,19 +119,27 @@ func NewChatTab(name string, sendMsg func(string) error, w fyne.Window, canSendM
 	}
 	sendButton := widget.NewButton("Send", func() {
 		text := msgEntry.Text
-		err := sendMsg(text)
+
+		err := msgEntry.Validate()
 		if err != nil {
 			dialog.ShowError(err, w)
 			return
 		}
-		err = msgEntry.Validate()
+
+		author, err := sendMsg(text)
 		if err != nil {
 			dialog.ShowError(err, w)
 			return
 		}
+
 		msgEntry.SetText("")
-		data = append(data, "Me: "+text)
+		data = append(data, author+": "+text)
+		messageList.ScrollToBottom()
+		messageList.Refresh()
 	})
+	msgEntry.OnSubmitted = func(_ string) {
+		sendButton.OnTapped()
+	}
 	content := container.NewBorder(nil, container.NewBorder(nil, nil, nil, sendButton, msgEntry), nil, nil, messageList)
 	return container.NewTabItem(name, content)
 }
@@ -158,19 +166,27 @@ func main() {
 		}
 	}
 
-	canSendMessage := func() bool {
+	sendMessage := func(message string) (string, error) {
 		currentTab, err := hc.GetSelectedTab()
 		if err != nil {
-			return false
+			return "", err
 		}
-		return hc.IsChannelJoined(currentTab.Login)
+		if !hc.IsChannelJoined(currentTab.Login) {
+			return "", errors.New("Channel not joined")
+		}
+		ac, err := hc.GetActiveAccount()
+		if err != nil {
+			return "", err
+		}
+		return ac.Login, hc.SendMessage(currentTab.Login, message)
+
 	}
 
 	savedTabs, err := hc.GetTabs()
 	if err == nil {
 		selectedTab, err := hc.GetSelectedTab()
 		for _, tab := range savedTabs {
-			newTab := NewChatTab(tab.DisplayName, hc.SendMessage, w, canSendMessage)
+			newTab := NewChatTab(tab.DisplayName, sendMessage, w)
 			tabs.Append(newTab)
 			if err == nil && selectedTab.DisplayName == tab.DisplayName {
 				tabs.Select(newTab)
@@ -193,7 +209,7 @@ func main() {
 					if err != nil {
 						dialog.ShowError(err, w)
 					} else {
-						tabs.Append(NewChatTab(entry.Text, hc.SendMessage, w, canSendMessage))
+						tabs.Append(NewChatTab(entry.Text, sendMessage, w))
 					}
 				}
 			}

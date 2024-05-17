@@ -47,6 +47,7 @@ func (w *TwitchChatWebsocket) New(token string, user string) (*TwitchChatWebsock
 		cancel:           cancel,
 		connection:       c,
 		initial_messages: &initial_messages,
+		channels:         make(map[string]struct{}),
 	}, nil
 }
 
@@ -97,6 +98,7 @@ func (w *TwitchChatWebsocket) Join(channel string) error {
 	if err != nil {
 		return err
 	}
+	w.channels[channel] = struct{}{}
 	return nil
 
 }

@@ -279,8 +279,7 @@ func (hc *HasherinoController) IsChannelJoined(channel string) bool {
 	return joinedChannel
 }
 
-func (hc *HasherinoController) SendMessage(message string) error {
-	channel := ""
+func (hc *HasherinoController) SendMessage(channel string, message string) error {
 	err := hc.chatWS.Send(channel, message)
 	return err
 }
