@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 
 	"fyne.io/fyne/v2/dialog"
 
@@ -190,9 +191,7 @@ func NewChatTab(
 		}
 		return nil
 	}
-	sendButton := widget.NewButton("Send", func() {
-		text := msgEntry.Text
-
+	msgEntry.OnSubmitted = func(text string) {
 		err := msgEntry.Validate()
 		if err != nil {
 			dialog.ShowError(err, window)
@@ -209,11 +208,8 @@ func NewChatTab(
 		data = append(data, author+": "+text)
 		messageList.ScrollToBottom()
 		messageList.Refresh()
-	})
-	msgEntry.OnSubmitted = func(_ string) {
-		sendButton.OnTapped()
 	}
-	content := container.NewBorder(nil, container.NewBorder(nil, nil, nil, sendButton, msgEntry), nil, nil, messageList)
+	content := container.NewBorder(nil, container.NewBorder(nil, nil, nil, nil, msgEntry), nil, nil, messageList)
 	return container.NewTabItem(name, content)
 }
 
@@ -265,10 +261,10 @@ func main() {
 
 	components := container.NewBorder(
 		container.NewHBox(
-			widget.NewButton("Settings", func() {
+			widget.NewButtonWithIcon("Settings", theme.SettingsIcon(), func() {
 				dialog.ShowCustom("Settings", "Close", container.NewBorder(nil, nil, nil, nil, NewSettingsTabs(hc, w)), w)
 			}),
-			widget.NewButton("Add tab", func() {
+			widget.NewButtonWithIcon("Add tab", theme.ContentAddIcon(), func() {
 				entry := widget.NewEntry()
 				entry.SetPlaceHolder("Channel")
 				items := []*widget.FormItem{
@@ -286,7 +282,7 @@ func main() {
 				}
 				dialog.ShowForm("Add tab", "Add", "Cancel", items, f, w)
 			}),
-			widget.NewButton("Close tab", func() {
+			widget.NewButtonWithIcon("Close tab", theme.CancelIcon(), func() {
 				tab, err := hc.GetSelectedTab()
 				if err != nil {
 					dialog.ShowError(err, w)
