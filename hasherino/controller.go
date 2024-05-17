@@ -216,8 +216,6 @@ func (hc *HasherinoController) GetSelectedTab() (*Tab, error) {
 }
 
 func (hc *HasherinoController) Listen(callbackMap map[string]func(ChatMessage)) error {
-	// TODO: parse string here and call each tab's callback with a parsed message object(take a channel-callback map)
-	// Try to find an existing IRC parser
 	activeAccount, err := hc.GetActiveAccount()
 	if err != nil {
 		return err
