@@ -197,7 +197,7 @@ func main() {
 			return "", err
 		}
 		if !hc.IsChannelJoined(currentTab.Login) {
-			return "", errors.New("Channel not joined")
+			return "", errors.New("Channel not joined. Please make sure you have an active account on settings.")
 		}
 		ac, err := hc.GetActiveAccount()
 		if err != nil {

@@ -68,7 +68,21 @@ func (hc *HasherinoController) AddAccount(id string, login string, token string)
 }
 
 func (hc *HasherinoController) RemoveAccount(id string) error {
-	return hc.permDB.Delete(&Account{}, "Id = ?", id).Error
+	return hc.permDB.Transaction(func(tx *gorm.DB) error {
+		account := &Account{}
+		result := tx.Take(&account, "Id = ?", id)
+		if result.Error != nil {
+			return result.Error
+		}
+		if account.Active {
+			hc.chatWS.Close()
+		}
+		result = tx.Delete(&account)
+		if result.Error != nil {
+			return result.Error
+		}
+		return nil
+	})
 }
 
 func (hc *HasherinoController) GetAccounts() ([]*Account, error) {
