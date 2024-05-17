@@ -241,7 +241,11 @@ func (hc *HasherinoController) Listen(callbackMap map[string]func(ChatMessage)) 
 		}
 		channel := ""
 		if len(msg.Params) > 0 {
-			channel = msg.Params[0][1:]
+			if len(msg.Params[0]) > 0 && msg.Params[0][0] == '#' {
+				channel = msg.Params[0][1:]
+			} else {
+				channel = msg.Params[0]
+			}
 		}
 		paramsText := ""
 		if len(msg.Params) > 1 {
@@ -264,6 +268,15 @@ func (hc *HasherinoController) Listen(callbackMap map[string]func(ChatMessage)) 
 
 	go hc.chatWS.Listen(callbackWrapper)
 	return nil
+}
+
+func (hc *HasherinoController) IsChannelJoined(channel string) bool {
+	if hc.chatWS == nil || hc.chatWS.State == Disconnected {
+		return false
+	}
+
+	_, joinedChannel := hc.chatWS.channels[channel]
+	return joinedChannel
 }
 
 func (hc *HasherinoController) SendMessage(message string) error {
