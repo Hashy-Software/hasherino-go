@@ -204,7 +204,9 @@ func NewChatTab(
 			return len(data)
 		},
 		func() fyne.CanvasObject {
-			return widget.NewLabel("template")
+			label := widget.NewLabel("template")
+			label.Wrapping = fyne.TextWrapWord
+			return label
 		},
 		func(i widget.ListItemID, o fyne.CanvasObject) {
 			o.(*widget.Label).SetText(data[i])
