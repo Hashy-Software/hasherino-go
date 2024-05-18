@@ -1,6 +1,7 @@
 package hasherino
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -270,4 +271,115 @@ func GetChatHistory(channel string, limit int) (*[]ChatMessage, error) {
 
 	return &messages, nil
 
+}
+
+type STVUserJson struct {
+	Data struct {
+		UserByConnection struct {
+			ID          string    `json:"id"`
+			Type        string    `json:"type"`
+			Username    string    `json:"username"`
+			Roles       []string  `json:"roles"`
+			CreatedAt   time.Time `json:"created_at"`
+			Connections []struct {
+				ID         string `json:"id"`
+				Platform   string `json:"platform"`
+				EmoteSetID string `json:"emote_set_id"`
+			} `json:"connections"`
+			Editors []struct {
+				User struct {
+					ID       string `json:"id"`
+					Username string `json:"username"`
+				} `json:"user"`
+			} `json:"editors"`
+			EmoteSets []struct {
+				ID     string `json:"id"`
+				Emotes []struct {
+					ID   string `json:"id"`
+					Name string `json:"name"`
+					Data struct {
+						ID   string `json:"id"`
+						Name string `json:"name"`
+					} `json:"data"`
+				} `json:"emotes"`
+				Capacity int `json:"capacity"`
+			} `json:"emote_sets"`
+		} `json:"userByConnection"`
+	} `json:"data"`
+}
+
+func STVGetUser(userId string) (*STVUserJson, error) {
+	query := map[string]interface{}{
+		"operationName": "GetUserByConnection",
+		"query": `
+        query GetUserByConnection($platform: ConnectionPlatform! $id: String!) {
+            userByConnection (platform: $platform id: $id) {
+                id
+          type
+          username
+          roles
+          created_at
+          connections {
+              id
+              platform
+              emote_set_id
+          }
+          editors {
+            user {
+              id
+              username
+            }
+          }
+          emote_sets {
+              id
+              emotes {
+                  id
+                  name
+                  data {
+                    id
+                    name
+                  }
+              }
+              capacity
+          }
+      }
+  }`,
+		"variables": map[string]interface{}{
+			"platform": "TWITCH",
+			"id":       userId,
+		},
+	}
+
+	jsonData, err := json.Marshal(query)
+	if err != nil {
+		fmt.Println("Error marshalling query:", err)
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", "https://7tv.io/v3/gql", bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Failed to create request for 7tv user %s with error %s", userId, err)
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("Failed to get 7tv user %s with error %s", userId, err)
+		return nil, err
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Failed to read response body: %s", err)
+		return nil, err
+	}
+
+	var stvUserJson STVUserJson
+	if err := json.Unmarshal(body, &stvUserJson); err != nil {
+		log.Printf("Failed to unmarshal response body: %s", err)
+		return nil, err
+	}
+
+	return &stvUserJson, nil
 }
