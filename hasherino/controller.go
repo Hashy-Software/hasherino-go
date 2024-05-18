@@ -192,9 +192,14 @@ func (hc *HasherinoController) AddTab(channel string) error {
 func (hc *HasherinoController) RemoveTab(id string) error {
 	err := hc.permDB.Transaction(func(tx *gorm.DB) error {
 		tab := &Tab{}
-		result := hc.permDB.Take(&tab, "Id = ?", id)
+		result := tx.Take(&tab, "Id = ?", id)
 		if result.Error != nil {
 			return errors.New("Tab not found for id " + id)
+		}
+
+		result = tx.Delete(&tab)
+		if result.Error != nil {
+			return result.Error
 		}
 
 		err := hc.chatWS.Part(tab.Login)

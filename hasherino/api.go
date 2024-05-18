@@ -2,6 +2,8 @@ package hasherino
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"log"
 	"math/rand"
@@ -249,6 +251,12 @@ func GetChatHistory(channel string, limit int) (*[]ChatMessage, error) {
 	if err := json.Unmarshal(body, &messagesJson); err != nil {
 		log.Printf("Failed to unmarshal response body: %s", err)
 		return nil, err
+	}
+
+	if messagesJson.Error != nil {
+		e := fmt.Sprintf("Failed to get chat history: %s", messagesJson.Error)
+		log.Printf(e)
+		return nil, errors.New(e)
 	}
 
 	messages := []ChatMessage{}
