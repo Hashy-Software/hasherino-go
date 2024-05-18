@@ -385,31 +385,39 @@ func STVGetUser(userId string) (*STVUserJson, error) {
 }
 
 type STVGlobalEmotesJson struct {
-	GlobalEmoteSet struct {
-		ID     string `json:"id"`
-		Name   string `json:"name"`
-		Emotes []struct {
-			ID       string `json:"id"`
-			Name     string `json:"name"`
-			Flags    int    `json:"flags"`
+	Data struct {
+		GlobalEmoteSet struct {
+			ID     string `json:"id"`
+			Name   string `json:"name"`
+			Emotes []struct {
+				ID       string `json:"id"`
+				Name     string `json:"name"`
+				Flags    int    `json:"flags"`
+				Typename string `json:"__typename"`
+			} `json:"emotes"`
+			Capacity int    `json:"capacity"`
 			Typename string `json:"__typename"`
-		} `json:"emotes"`
-		Capacity int    `json:"capacity"`
-		Typename string `json:"__typename"`
-	} `json:"globalEmoteSet"`
-	Roles []struct {
-		ID        string `json:"id"`
-		Name      string `json:"name"`
-		Allowed   string `json:"allowed"`
-		Denied    string `json:"denied"`
-		Position  int    `json:"position"`
-		Color     int    `json:"color"`
-		Invisible bool   `json:"invisible"`
-		Typename  string `json:"__typename"`
-	} `json:"roles"`
+		} `json:"globalEmoteSet"`
+		Roles []struct {
+			ID        string `json:"id"`
+			Name      string `json:"name"`
+			Allowed   string `json:"allowed"`
+			Denied    string `json:"denied"`
+			Position  int    `json:"position"`
+			Color     int    `json:"color"`
+			Invisible bool   `json:"invisible"`
+			Typename  string `json:"__typename"`
+		} `json:"roles"`
+	} `json:"data"`
 }
 
-func STVGetGlobalEmotes() (*STVGlobalEmotesJson, error) {
+var cachedStvGlobalEmotes *STVGlobalEmotesJson = nil
+
+func STVGetGlobalEmotes() (*STVGlobalEmotesJson, error, bool) {
+	if cachedStvGlobalEmotes != nil {
+		return cachedStvGlobalEmotes, nil, true
+	}
+
 	query := map[string]interface{}{
 		"operationName": "AppState",
 		"query": `
@@ -443,34 +451,35 @@ func STVGetGlobalEmotes() (*STVGlobalEmotesJson, error) {
 	jsonData, err := json.Marshal(query)
 	if err != nil {
 		fmt.Println("Error marshalling query:", err)
-		return nil, err
+		return nil, err, false
 	}
 
 	req, err := http.NewRequest("POST", "https://7tv.io/v3/gql", bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Failed to create request for 7tv global emotes: %s", err)
-		return nil, err
+		return nil, err, false
 	}
 	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Printf("Failed to get 7tv global emotes: %s", err)
-		return nil, err
+		return nil, err, false
 	}
 
 	body, err := io.ReadAll(resp.Body)
-	println(string(body))
 	if err != nil {
 		log.Printf("Failed to read response body: %s", err)
-		return nil, err
+		return nil, err, false
 	}
 
 	var stvGlobalEmotes STVGlobalEmotesJson
 	if err := json.Unmarshal(body, &stvGlobalEmotes); err != nil {
 		log.Printf("Failed to unmarshal response body: %s", err)
-		return nil, err
+		return nil, err, false
 	}
 
-	return &stvGlobalEmotes, nil
+	cachedStvGlobalEmotes = &stvGlobalEmotes
+
+	return &stvGlobalEmotes, nil, false
 }

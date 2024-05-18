@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -24,19 +25,24 @@ type HasherinoController struct {
 
 func (hc *HasherinoController) New(callbackMap map[string]func(ChatMessage)) (*HasherinoController, error) {
 	chatWS := &TwitchChatWebsocket{}
-	memDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	if err != nil {
-		return nil, err
-	}
+
 	dataFolder, err := GetDataFolder()
 	if err != nil {
 		return nil, err
 	}
+
+	memDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		return nil, err
+	}
+	memDB.AutoMigrate(&TempTab{}, &ChatUser{}, &Emote{}, &ChatUserTempTab{})
+
 	permDB, err := gorm.Open(sqlite.Open(filepath.Join(dataFolder, "gorm.db")), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
 	permDB.AutoMigrate(&Account{}, &Tab{}, &AppSettings{})
+
 	c := &HasherinoController{
 		appId:       "hvmj7blkwy2gw3xf820n47i85g4sub",
 		callbackMap: callbackMap,
@@ -184,8 +190,54 @@ func (hc *HasherinoController) AddTab(channel string) error {
 			return errors.New("Failed to join channel " + channel)
 		}
 
+		err = hc.AddTempTab(users.Data[0].ID)
+
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
+	return err
+}
+
+func (hc *HasherinoController) AddTempTab(channelId string) error {
+	err := hc.memDB.Transaction(func(tx *gorm.DB) error {
+		emotes, err, isCached := STVGetGlobalEmotes()
+		// Insert global emotes into tempDB
+		if !isCached {
+			if err != nil {
+				log.Printf("Failed to load global 7tv emotes: %s", err)
+			} else {
+				emoteObjs := []Emote{}
+				for _, emote := range emotes.Data.GlobalEmoteSet.Emotes {
+					emoteObjs = append(emoteObjs, Emote{
+						Id:        emote.ID,
+						Source:    SevenTV,
+						Name:      emote.Name,
+						ChannelID: nil,
+						OwnerID:   "",
+						Owner:     nil,
+					})
+				}
+				log.Println("Loaded " + strconv.Itoa(len(emoteObjs)) + " 7tv global emotes")
+				result := tx.Create(&emoteObjs)
+				if result.Error != nil {
+					log.Printf("Failed to save global 7tv emotes: %s", result.Error)
+				}
+			}
+		}
+
+		result := tx.Create(&TempTab{
+			Id:        channelId,
+			ChatUsers: []ChatUser{},
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		return nil
+	})
+
 	return err
 }
 
@@ -198,6 +250,11 @@ func (hc *HasherinoController) RemoveTab(id string) error {
 		}
 
 		result = tx.Delete(&tab)
+		if result.Error != nil {
+			return result.Error
+		}
+
+		result = hc.memDB.Delete(&TempTab{}, "Id = ?", id)
 		if result.Error != nil {
 			return result.Error
 		}

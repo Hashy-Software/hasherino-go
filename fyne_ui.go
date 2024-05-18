@@ -322,6 +322,11 @@ func main() {
 		selectedTab, err := hc.GetSelectedTab()
 		for _, tab := range savedTabs {
 			newTab := NewChatTab(tab.Login, sendMessage, w, hc.GetSettings)
+			tempTabErr := hc.AddTempTab(tab.Id)
+			if tempTabErr != nil {
+				log.Println(tempTabErr)
+				continue
+			}
 			chatTabs.Append(newTab)
 			if err == nil && selectedTab.Login == tab.Login {
 				chatTabs.Select(newTab)
@@ -372,6 +377,7 @@ func main() {
 					dialog.ShowError(err, w)
 					return
 				}
+				delete(callbackMap, tab.Login)
 				chatTabs.Remove(chatTabs.Selected())
 			}),
 		),
