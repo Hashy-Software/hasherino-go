@@ -158,6 +158,11 @@ func (hc *HasherinoController) AddTab(channel string) error {
 			return errors.New("No active account")
 		}
 
+		_, exists := hc.chatWS.channels[channel]
+		if exists {
+			return errors.New("Already joined channel " + channel)
+		}
+
 		helix := NewHelix(hc.appId)
 		users, err := helix.GetUsers(activeAccount.Token, []string{channel})
 		if err != nil || len(users.Data) != 1 {

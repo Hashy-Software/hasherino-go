@@ -335,21 +335,29 @@ func main() {
 			}),
 			widget.NewButtonWithIcon("Add tab", theme.ContentAddIcon(), func() {
 				entry := widget.NewEntry()
-				entry.SetPlaceHolder("Channel")
 				items := []*widget.FormItem{
 					widget.NewFormItem("New tab", entry),
 				}
-				f := func(b bool) {
+				var newTabDialog *dialog.FormDialog
+				addTabFunc := func(b bool) {
 					if b {
 						err := hc.AddTab(entry.Text)
 						if err != nil {
 							dialog.ShowError(err, w)
 						} else {
 							chatTabs.Append(NewChatTab(entry.Text, sendMessage, w, hc.GetSettings))
+							newTabDialog.Hide()
 						}
 					}
 				}
-				dialog.ShowForm("Add tab", "Add", "Cancel", items, f, w)
+				newTabDialog = dialog.NewForm("Add tab", "Add", "Cancel", items, addTabFunc, w)
+				entry.SetPlaceHolder("Channel")
+				entry.OnSubmitted = func(_ string) {
+					addTabFunc(true)
+				}
+				newTabDialog.Show()
+
+				w.Canvas().Focus(entry)
 			}),
 			widget.NewButtonWithIcon("Close tab", theme.CancelIcon(), func() {
 				tab, err := hc.GetSelectedTab()
