@@ -2,13 +2,14 @@ package hasherino
 
 import (
 	"encoding/json"
-	"github.com/pkg/browser"
 	"io"
 	"log"
 	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/pkg/browser"
 )
 
 type TwitchOAuth struct {
@@ -210,5 +211,55 @@ func (h *Helix) GetUsers(token string, usernames []string) (*HelixUsers, error) 
 	}
 
 	return &users, nil
+
+}
+
+type ChatMessagesJson struct {
+	Messages  []string `json:"messages"`
+	Error     any      `json:"error"`
+	ErrorCode any      `json:"error_code"`
+}
+
+func GetChatHistory(channel string, limit int) (*[]ChatMessage, error) {
+	url := "https://recent-messages.robotty.de/api/v2/recent-messages/"
+	url += channel
+	url += "?limit=" + strconv.Itoa(limit)
+
+	req, err := http.NewRequest("GET", url, nil)
+
+	if err != nil {
+		log.Printf("Failed to create request for chat history: %s", err)
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("Failed to get chat history: %s", err)
+		return nil, err
+	}
+	log.Printf("Chat history status code: %d", resp.StatusCode)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Failed to read response body: %s", err)
+		return nil, err
+	}
+
+	var messagesJson ChatMessagesJson
+	if err := json.Unmarshal(body, &messagesJson); err != nil {
+		log.Printf("Failed to unmarshal response body: %s", err)
+		return nil, err
+	}
+
+	messages := []ChatMessage{}
+	for _, messageStr := range messagesJson.Messages {
+		msg, err := ParseMessage(messageStr)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, *msg)
+	}
+
+	return &messages, nil
 
 }

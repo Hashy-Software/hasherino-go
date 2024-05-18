@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"log"
+	"net/url"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -131,9 +132,53 @@ func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *containe
 			log.Println(err)
 		}
 	}
+	RobottyURL, err := url.Parse("https://recent-messages.robotty.de/")
+	if err != nil {
+		log.Printf("Could not parse Robotty URL: %v", err)
+	}
+	disclaimer := `
+	This feature loads data from a third-party service on Startup. 
+	Channels you join will be sent to that service, and the service will
+	store messages for channels you visit to provice the service.
+	Would you like to enable this feature?
+	`
+	historyChoice := widget.NewCheck("", func(b bool) {})
+	historyChoice.OnChanged = func(b bool) {
+		settings.ChatHistory = b
+		if !b {
+			settings.ChatHistory = false
+			err = hc.SetSettings(settings)
+			if err != nil {
+				dialog.ShowError(err, w)
+			}
+			return
+		} else {
+			historyChoice.Checked = false // if the user clicks cancel, it has to remain unchecked
+			dialog.ShowCustomConfirm(
+				"Disclaimer",
+				"",
+				"Cancel",
+				container.NewVBox(
+					widget.NewLabel(disclaimer),
+					widget.NewHyperlink("Click here for more information", RobottyURL),
+				),
+				func(b bool) {
+					settings.ChatHistory = b
+					historyChoice.Checked = b
+					historyChoice.Refresh()
+					err = hc.SetSettings(settings)
+					if err != nil {
+						dialog.ShowError(err, w)
+					}
+				},
+				w,
+			)
+		}
+	}
+	historyChoice.Checked = settings.ChatHistory
 	generalBox := container.NewVBox(
 		container.NewHBox(widget.NewLabel("Chat message limit"), layout.NewSpacer(), chatLimitEntry),
-		widget.NewLabel(""),
+		container.NewHBox(widget.NewLabel("Chat history"), layout.NewSpacer(), historyChoice),
 		widget.NewLabel(""),
 		widget.NewLabel(""),
 		widget.NewLabel(""),
@@ -148,7 +193,7 @@ func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *containe
 }
 
 func NewChatTab(
-	name string,
+	channel string,
 	sendMsg func(string) (string, error),
 	window fyne.Window,
 	settingsFunc func() (*hasherino.AppSettings, error),
@@ -164,7 +209,7 @@ func NewChatTab(
 		func(i widget.ListItemID, o fyne.CanvasObject) {
 			o.(*widget.Label).SetText(data[i])
 		})
-	callbackMap[name] = func(message hasherino.ChatMessage) {
+	callbackMap[channel] = func(message hasherino.ChatMessage) {
 		if message.Command != "PRIVMSG" {
 			return
 		}
@@ -183,6 +228,30 @@ func NewChatTab(
 		messageList.ScrollToBottom()
 		messageList.Refresh()
 	}
+	go func() {
+		settings, err := settingsFunc()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		if !settings.ChatHistory {
+			return
+		}
+		historyMsgs, err := hasherino.GetChatHistory(channel, settings.ChatMessageLimit)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		callback, ok := callbackMap[channel]
+		if !ok {
+			log.Printf("No callback for channel %s.", channel)
+			return
+		}
+		for _, msg := range *historyMsgs {
+			callback(msg)
+		}
+
+	}()
 	msgEntry := widget.NewEntry()
 	msgEntry.SetPlaceHolder("Message")
 	msgEntry.Validator = func(s string) error {
@@ -210,13 +279,13 @@ func NewChatTab(
 		messageList.Refresh()
 	}
 	content := container.NewBorder(nil, container.NewBorder(nil, nil, nil, nil, msgEntry), nil, nil, messageList)
-	return container.NewTabItem(name, content)
+	return container.NewTabItem(channel, content)
 }
 
 func main() {
 	a := app.New()
 	w := a.NewWindow("hasherino2")
-	w.Resize(fyne.NewSize(400, 600))
+	w.Resize(fyne.NewSize(600, 800))
 
 	hc := &hasherino.HasherinoController{}
 	hc, err := hc.New(callbackMap)

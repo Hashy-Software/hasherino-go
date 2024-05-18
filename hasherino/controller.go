@@ -6,12 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-
-	"gopkg.in/irc.v4"
 )
 
 // Controlls everything in the app. Called by UI code, making it UI library agnostic.
@@ -23,13 +20,6 @@ type HasherinoController struct {
 	chatWS      *TwitchChatWebsocket
 	memDB       *gorm.DB
 	permDB      *gorm.DB
-}
-
-type ChatMessage struct {
-	ChannelID string
-	Command   string
-	Author    string
-	Text      string
 }
 
 func (hc *HasherinoController) New(callbackMap map[string]func(ChatMessage)) (*HasherinoController, error) {
@@ -58,7 +48,7 @@ func (hc *HasherinoController) New(callbackMap map[string]func(ChatMessage)) (*H
 	settings := &AppSettings{}
 	result := permDB.Take(settings)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		result = permDB.Create(&AppSettings{ChatMessageLimit: 100})
+		result = permDB.Create(&AppSettings{ChatMessageLimit: 100, ChatHistory: false})
 	} else if result.Error != nil {
 		return nil, err
 	}
@@ -271,29 +261,18 @@ func (hc *HasherinoController) Listen() error {
 	}
 
 	callbackWrapper := func(message string) {
-		msg, err := irc.ParseMessage(message)
+		msg, err := ParseMessage(message)
 		if err != nil {
 			log.Printf("Failed to parse message: %s", err)
 			return
 		}
-		channel := ""
-		if len(msg.Params) > 0 {
-			if len(msg.Params[0]) > 0 && msg.Params[0][0] == '#' {
-				channel = msg.Params[0][1:]
-			} else {
-				channel = msg.Params[0]
-			}
-		}
-		paramsText := ""
-		if len(msg.Params) > 1 {
-			paramsText = strings.Join(msg.Params[1:], " ")
-		}
-		callback, ok := hc.callbackMap[channel]
+
+		callback, ok := hc.callbackMap[msg.Channel]
 		if !ok {
-			log.Printf("No callback for channel %s.", channel)
+			log.Printf("No callback for channel %s.", msg.Channel)
 			return
 		}
-		callback(ChatMessage{ChannelID: channel, Command: msg.Command, Author: msg.Name, Text: paramsText})
+		callback(*msg)
 	}
 
 	for channel := range hc.callbackMap {

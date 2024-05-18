@@ -21,4 +21,5 @@ type Tab struct {
 type AppSettings struct {
 	gorm.Model
 	ChatMessageLimit int // Maximum amount of messages in a single chat
+	ChatHistory      bool
 }
