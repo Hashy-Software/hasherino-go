@@ -383,3 +383,94 @@ func STVGetUser(userId string) (*STVUserJson, error) {
 
 	return &stvUserJson, nil
 }
+
+type STVGlobalEmotesJson struct {
+	GlobalEmoteSet struct {
+		ID     string `json:"id"`
+		Name   string `json:"name"`
+		Emotes []struct {
+			ID       string `json:"id"`
+			Name     string `json:"name"`
+			Flags    int    `json:"flags"`
+			Typename string `json:"__typename"`
+		} `json:"emotes"`
+		Capacity int    `json:"capacity"`
+		Typename string `json:"__typename"`
+	} `json:"globalEmoteSet"`
+	Roles []struct {
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		Allowed   string `json:"allowed"`
+		Denied    string `json:"denied"`
+		Position  int    `json:"position"`
+		Color     int    `json:"color"`
+		Invisible bool   `json:"invisible"`
+		Typename  string `json:"__typename"`
+	} `json:"roles"`
+}
+
+func STVGetGlobalEmotes() (*STVGlobalEmotesJson, error) {
+	query := map[string]interface{}{
+		"operationName": "AppState",
+		"query": `
+        query AppState {
+          globalEmoteSet: namedEmoteSet(name: GLOBAL) {
+            id
+            name
+            emotes {
+              id
+              name
+              flags
+              __typename
+            }
+            capacity
+            __typename
+          }
+          roles: roles {
+            id
+            name
+            allowed
+            denied
+            position
+            color
+            invisible
+            __typename
+          }
+        }`,
+		"variables": map[string]interface{}{},
+	}
+
+	jsonData, err := json.Marshal(query)
+	if err != nil {
+		fmt.Println("Error marshalling query:", err)
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", "https://7tv.io/v3/gql", bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Failed to create request for 7tv global emotes: %s", err)
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("Failed to get 7tv global emotes: %s", err)
+		return nil, err
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	println(string(body))
+	if err != nil {
+		log.Printf("Failed to read response body: %s", err)
+		return nil, err
+	}
+
+	var stvGlobalEmotes STVGlobalEmotesJson
+	if err := json.Unmarshal(body, &stvGlobalEmotes); err != nil {
+		log.Printf("Failed to unmarshal response body: %s", err)
+		return nil, err
+	}
+
+	return &stvGlobalEmotes, nil
+}
