@@ -277,32 +277,22 @@ type STVUserJson struct {
 	Data struct {
 		UserByConnection struct {
 			ID          string    `json:"id"`
-			Type        string    `json:"type"`
 			Username    string    `json:"username"`
-			Roles       []string  `json:"roles"`
+			DisplayName string    `json:"display_name"`
 			CreatedAt   time.Time `json:"created_at"`
-			Connections []struct {
-				ID         string `json:"id"`
-				Platform   string `json:"platform"`
-				EmoteSetID string `json:"emote_set_id"`
-			} `json:"connections"`
-			Editors []struct {
-				User struct {
-					ID       string `json:"id"`
-					Username string `json:"username"`
-				} `json:"user"`
-			} `json:"editors"`
-			EmoteSets []struct {
+			AvatarURL   string    `json:"avatar_url"`
+			Biography   string    `json:"biography"`
+			EmoteSets   []struct {
 				ID     string `json:"id"`
+				Name   string `json:"name"`
 				Emotes []struct {
-					ID   string `json:"id"`
-					Name string `json:"name"`
 					Data struct {
-						ID   string `json:"id"`
-						Name string `json:"name"`
+						ID       string `json:"id"`
+						Name     string `json:"name"`
+						Animated bool   `json:"animated"`
+						Listed   bool   `json:"listed"`
 					} `json:"data"`
 				} `json:"emotes"`
-				Capacity int `json:"capacity"`
 			} `json:"emote_sets"`
 		} `json:"userByConnection"`
 	} `json:"data"`
@@ -315,33 +305,23 @@ func STVGetUser(userId string) (*STVUserJson, error) {
         query GetUserByConnection($platform: ConnectionPlatform! $id: String!) {
             userByConnection (platform: $platform id: $id) {
                 id
-          type
-          username
-          roles
-          created_at
-          connections {
-              id
-              platform
-              emote_set_id
-          }
-          editors {
-            user {
-              id
-              username
-            }
-          }
-          emote_sets {
-              id
-              emotes {
-                  id
-                  name
-                  data {
-                    id
-                    name
-                  }
-              }
-              capacity
-          }
+        				username
+        				display_name
+        				created_at
+        				avatar_url
+        				biography
+        				emote_sets {
+            				id
+            				name
+            				emotes {
+                				data {
+                    				id
+                    				name
+                    				animated
+                    				listed
+                				}
+            				}
+        				}
       }
   }`,
 		"variables": map[string]interface{}{
@@ -386,28 +366,20 @@ func STVGetUser(userId string) (*STVUserJson, error) {
 
 type STVGlobalEmotesJson struct {
 	Data struct {
-		GlobalEmoteSet struct {
+		EmoteSet struct {
 			ID     string `json:"id"`
 			Name   string `json:"name"`
 			Emotes []struct {
-				ID       string `json:"id"`
-				Name     string `json:"name"`
-				Flags    int    `json:"flags"`
-				Typename string `json:"__typename"`
+				ID   string `json:"id"`
+				Name string `json:"name"`
+				Data struct {
+					ID       string `json:"id"`
+					Name     string `json:"name"`
+					Animated bool   `json:"animated"`
+					Listed   bool   `json:"listed"`
+				} `json:"data"`
 			} `json:"emotes"`
-			Capacity int    `json:"capacity"`
-			Typename string `json:"__typename"`
-		} `json:"globalEmoteSet"`
-		Roles []struct {
-			ID        string `json:"id"`
-			Name      string `json:"name"`
-			Allowed   string `json:"allowed"`
-			Denied    string `json:"denied"`
-			Position  int    `json:"position"`
-			Color     int    `json:"color"`
-			Invisible bool   `json:"invisible"`
-			Typename  string `json:"__typename"`
-		} `json:"roles"`
+		} `json:"emoteSet"`
 	} `json:"data"`
 }
 
@@ -419,32 +391,25 @@ func STVGetGlobalEmotes() (*STVGlobalEmotesJson, error, bool) {
 	}
 
 	query := map[string]interface{}{
-		"operationName": "AppState",
+		"operationName": "EmoteSet",
 		"query": `
-        query AppState {
-          globalEmoteSet: namedEmoteSet(name: GLOBAL) {
-            id
-            name
-            emotes {
-              id
-              name
-              flags
-              __typename
-            }
-            capacity
-            __typename
-          }
-          roles: roles {
-            id
-            name
-            allowed
-            denied
-            position
-            color
-            invisible
-            __typename
-          }
-        }`,
+        query EmoteSet {
+    			emoteSet(id: "63584dd8848525f4dd62b143") {
+        			id
+        			name
+        			emotes {
+            			id
+            			name
+            			data {
+                			id
+                			name
+                			animated
+                			listed
+            			}
+        			}
+    			}
+			}
+`,
 		"variables": map[string]interface{}{},
 	}
 

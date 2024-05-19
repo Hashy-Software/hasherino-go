@@ -5,11 +5,16 @@ import (
 	"log"
 	"net/url"
 	"strconv"
+	"strings"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/theme"
+	x_widget "fyne.io/x/fyne/widget"
 
 	"fyne.io/fyne/v2/dialog"
 
@@ -20,6 +25,7 @@ import (
 )
 
 var callbackMap = make(map[string]func(hasherino.ChatMessage))
+var defaultEmoteSize = fyne.NewSize(32, 32)
 
 func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *container.AppTabs {
 	// Accounts tab
@@ -192,9 +198,45 @@ func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *containe
 	return tabs
 }
 
+// type EmoteWidget struct {
+// 	fyne.Tappable
+//
+// 	Emote *fyne.CanvasObject
+// }
+
+func NewEmoteCanvasObject(emote *hasherino.Emote) (*fyne.CanvasObject, error) {
+	url, err := emote.GetUrl()
+	if err != nil {
+		return nil, err
+	}
+	uri, err := storage.ParseURI(url)
+	if err != nil {
+		return nil, err
+	}
+	var imgContainer fyne.CanvasObject
+	if emote.Animated {
+		image, err := x_widget.NewAnimatedGif(uri)
+		if err != nil {
+			return nil, err
+		}
+		image.Start()
+		imgContainer = container.NewWithoutLayout(image)
+		image.Resize(defaultEmoteSize)
+		imgContainer.Resize(defaultEmoteSize)
+	} else {
+		image := canvas.NewImageFromURI(uri)
+		imgContainer = container.NewWithoutLayout(image)
+		image.Resize(defaultEmoteSize)
+		imgContainer.Resize(defaultEmoteSize)
+	}
+
+	return &imgContainer, nil
+}
+
 func NewChatTab(
 	channel string,
 	sendMsg func(string) (string, error),
+	getEmotes func() ([]*hasherino.Emote, error),
 	window fyne.Window,
 	settingsFunc func() (*hasherino.AppSettings, error),
 ) *container.TabItem {
@@ -280,7 +322,58 @@ func NewChatTab(
 		messageList.ScrollToBottom()
 		messageList.Refresh()
 	}
-	content := container.NewBorder(nil, container.NewBorder(nil, nil, nil, nil, msgEntry), nil, nil, messageList)
+	content := container.NewBorder(nil, container.NewBorder(nil, nil, nil, widget.NewButton("😃", func() {
+		emotes, err := getEmotes()
+		if err != nil {
+			dialog.ShowError(err, window)
+			return
+		}
+
+		newWindow := fyne.CurrentApp().NewWindow("Select emote")
+		newWindow.Resize(fyne.NewSize(300, 300))
+		newWindow.SetContent(container.NewCenter(widget.NewLabel("Loading...")))
+		newWindow.Show()
+
+		var images []fyne.CanvasObject
+		mutex := sync.Mutex{}
+
+		fourth := len(emotes) / 4
+		emoteSlices := [][]*hasherino.Emote{
+			emotes[:fourth],
+			emotes[fourth : 2*fourth],
+			emotes[2*fourth : 3*fourth],
+			emotes[3*fourth:],
+		}
+		var wg sync.WaitGroup
+
+		for _, emoteSlice := range emoteSlices {
+			wg.Add(1)
+			go func(emoteSlice []*hasherino.Emote) {
+				defer wg.Done()
+
+				for _, emote := range emoteSlice {
+					imgCanvas, err := NewEmoteCanvasObject(emote)
+					if err != nil {
+						log.Println(err)
+						continue
+					}
+					mutex.Lock()
+					images = append(images, *imgCanvas)
+					mutex.Unlock()
+				}
+			}(emoteSlice)
+		}
+		wg.Wait()
+		grid := container.NewGridWrap(defaultEmoteSize, images...)
+		accordion := widget.NewAccordion(
+			widget.NewAccordionItem("Twitch Emotes", widget.NewLabel("Not implemented")),
+			widget.NewAccordionItem("7TV Emotes"+strings.Repeat(" ", 80), grid),
+			widget.NewAccordionItem("FFZ Emotes", widget.NewLabel("Not implemented")),
+			widget.NewAccordionItem("BTTV Emotes", widget.NewLabel("Not implemented")),
+			widget.NewAccordionItem("Emoji", widget.NewLabel("Not implemented")),
+		)
+		newWindow.SetContent(accordion)
+	}), msgEntry), nil, nil, messageList)
 	return container.NewTabItem(channel, content)
 }
 
@@ -321,7 +414,7 @@ func main() {
 	if err == nil {
 		selectedTab, err := hc.GetSelectedTab()
 		for _, tab := range savedTabs {
-			newTab := NewChatTab(tab.Login, sendMessage, w, hc.GetSettings)
+			newTab := NewChatTab(tab.Login, sendMessage, hc.GetEmotes, w, hc.GetSettings)
 			tempTabErr := hc.AddTempTab(tab.Id)
 			if tempTabErr != nil {
 				log.Println(tempTabErr)
@@ -352,7 +445,7 @@ func main() {
 						if err != nil {
 							dialog.ShowError(err, w)
 						} else {
-							chatTabs.Append(NewChatTab(entry.Text, sendMessage, w, hc.GetSettings))
+							chatTabs.Append(NewChatTab(entry.Text, sendMessage, hc.GetEmotes, w, hc.GetSettings))
 							newTabDialog.Hide()
 						}
 					}

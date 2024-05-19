@@ -56,18 +56,6 @@ type ChatUserTempTab struct {
 	TempTabId  string `gorm:"primaryKey"`
 }
 
-type Emote struct {
-	Id     string          `gorm:"primaryKey"`
-	Source EmoteSourceEnum `gorm:"primaryKey"`
-	Name   string
-	// if a channel is set, only renders in that channel
-	ChannelID *string
-	// Foreign key field
-	OwnerID string `gorm:"index"`
-	// if an owner is set, only renders when the message sender is the owner
-	Owner *ChatUser `gorm:"foreignKey:OwnerID;references:Id"`
-}
-
 // When a TempTab gets deleted, delete all orphaned ChatUsers
 func (c *ChatUserTempTab) AfterDelete(tx *gorm.DB) (err error) {
 	var count int64
@@ -82,13 +70,42 @@ func (c *ChatUserTempTab) AfterDelete(tx *gorm.DB) (err error) {
 	return nil
 }
 
+type Emote struct {
+	Id       string          `gorm:"primaryKey"`
+	Source   EmoteSourceEnum `gorm:"primaryKey"`
+	Name     string
+	Animated bool
+	// if a channel is set, only renders in that channel
+	ChannelID *string
+	// Foreign key field
+	OwnerID string `gorm:"index"`
+	// if an owner is set, only renders when the message sender is the owner
+	Owner *ChatUser `gorm:"foreignKey:OwnerID;references:Id"`
+}
+
 func (e *Emote) GetUrl() (string, error) {
+	var result string
 	switch e.Source {
 	case Twitch:
-		return "https://static-cdn.jtvnw.net/emoticons/v2/" + e.Id + "/default/dark/2.0", nil
+		result = "https://static-cdn.jtvnw.net/emoticons/v2/" + e.Id + "/default/dark/2.0"
 	case SevenTV:
-		return "https://cdn.7tv.app/emote/" + e.Id + "/2x.webp", nil
+		result = "https://cdn.7tv.app/emote/" + e.Id + "/2x"
 	default:
 		return "", errors.New("Unknown emote source")
+	}
+	return result + e.getUrlExtension(), nil
+}
+
+func (e *Emote) getUrlExtension() string {
+	switch e.Source {
+	case Twitch:
+		return ""
+	case SevenTV:
+		if e.Animated {
+			return ".gif"
+		}
+		return ".png"
+	default:
+		return ".png"
 	}
 }

@@ -210,11 +210,12 @@ func (hc *HasherinoController) AddTempTab(channelId string) error {
 				log.Printf("Failed to load global 7tv emotes: %s", err)
 			} else {
 				emoteObjs := []Emote{}
-				for _, emote := range emotes.Data.GlobalEmoteSet.Emotes {
+				for _, emote := range emotes.Data.EmoteSet.Emotes {
 					emoteObjs = append(emoteObjs, Emote{
 						Id:        emote.ID,
 						Source:    SevenTV,
 						Name:      emote.Name,
+						Animated:  emote.Data.Animated,
 						ChannelID: nil,
 						OwnerID:   "",
 						Owner:     nil,
@@ -239,6 +240,36 @@ func (hc *HasherinoController) AddTempTab(channelId string) error {
 	})
 
 	return err
+}
+
+func (hc *HasherinoController) GetEmotes() ([]*Emote, error) {
+	emotes := []*Emote{}
+	err := hc.memDB.Transaction(func(tx *gorm.DB) error {
+		tab := &Tab{}
+		result := hc.permDB.Take(&tab, "Selected = ?", true)
+		if result.Error != nil {
+			return result.Error
+		}
+		activeAccount := &Account{}
+		result = hc.permDB.Take(&activeAccount, "Active = ?", true)
+		if result.Error != nil {
+			return result.Error
+		}
+		// query := "(OwnerID = ? OR OwnerID = null) AND (ChannelID = ? OR ChannelID = null)"
+		// query := "channel_id = ? OR channel_id = null"
+		result = tx.Find(&emotes)
+		println("Loaded " + strconv.Itoa(len(emotes)) + " emotes")
+		// result = tx.Where(query, activeAccount.Id, tab.Id).Find(&emotes)
+		if result.Error != nil {
+			return result.Error
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return emotes, nil
 }
 
 func (hc *HasherinoController) RemoveTab(id string) error {
