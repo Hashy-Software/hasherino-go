@@ -76,9 +76,9 @@ type Emote struct {
 	Name     string
 	Animated bool
 	// if a channel is set, only renders in that channel
-	ChannelID *string
+	ChannelID *string `gorm:"primaryKey"`
 	// Foreign key field
-	OwnerID string `gorm:"index"`
+	OwnerID string `gorm:"primaryKey;index"`
 	// if an owner is set, only renders when the message sender is the owner
 	Owner *ChatUser `gorm:"foreignKey:OwnerID;references:Id"`
 }

@@ -367,7 +367,7 @@ func NewChatTab(
 		grid := container.NewGridWrap(defaultEmoteSize, images...)
 		accordion := widget.NewAccordion(
 			widget.NewAccordionItem("Twitch Emotes", widget.NewLabel("Not implemented")),
-			widget.NewAccordionItem("7TV Emotes"+strings.Repeat(" ", 80), grid),
+			widget.NewAccordionItem("7TV Emotes"+strings.Repeat(" ", 80), container.NewScroll(grid)),
 			widget.NewAccordionItem("FFZ Emotes", widget.NewLabel("Not implemented")),
 			widget.NewAccordionItem("BTTV Emotes", widget.NewLabel("Not implemented")),
 			widget.NewAccordionItem("Emoji", widget.NewLabel("Not implemented")),
@@ -413,18 +413,21 @@ func main() {
 	savedTabs, err := hc.GetTabs()
 	if err == nil {
 		selectedTab, err := hc.GetSelectedTab()
+		var tabIds []string
+
 		for _, tab := range savedTabs {
+			tabIds = append(tabIds, tab.Id)
 			newTab := NewChatTab(tab.Login, sendMessage, hc.GetEmotes, w, hc.GetSettings)
-			tempTabErr := hc.AddTempTab(tab.Id)
-			if tempTabErr != nil {
-				log.Println(tempTabErr)
-				continue
-			}
 			chatTabs.Append(newTab)
 			if err == nil && selectedTab.Login == tab.Login {
 				chatTabs.Select(newTab)
 			}
 		}
+		tempTabErr := hc.AddTempTabs(&tabIds)
+		if tempTabErr != nil {
+			log.Println(tempTabErr)
+		}
+
 	}
 	hc.Listen()
 
