@@ -19,8 +19,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// AnimatedGif widget shows a Gif image with many frames.
-type AnimatedGif struct {
+// EmoteGif widget shows a Gif image with many frames.
+type EmoteGif struct {
 	widget.BaseWidget
 	min fyne.Size
 
@@ -30,32 +30,59 @@ type AnimatedGif struct {
 	remaining         int
 	stopping, running bool
 	runLock           sync.RWMutex
+
+	// custom attributes
+	emote         *Emote
+	clickCallback func(string) error
 }
 
-// NewAnimatedGif creates a new widget loaded to show the specified image.
+type EmoteSourceEnum int64
+
+const (
+	Twitch EmoteSourceEnum = iota
+	SevenTV
+)
+
+type Emote struct {
+	Id       string
+	Source   EmoteSourceEnum
+	Name     string
+	Animated bool
+}
+
+var gifCache = make(map[string]*EmoteGif)
+
+// NewEmoteGif creates a new widget loaded to show the specified image.
 // If there is an error loading the image it will be returned in the error value.
-func NewAnimatedGif(u fyne.URI) (*AnimatedGif, error) {
+func NewEmoteGif(u fyne.URI) (*EmoteGif, error) {
 	ret := newGif()
 
 	return ret, ret.Load(u)
 }
 
-// NewAnimatedGifFromResource creates a new widget loaded to show the specified image resource.
+// NewEmoteGifFromResource creates a new widget loaded to show the specified image resource.
 // If there is an error loading the image it will be returned in the error value.
-func NewAnimatedGifFromResource(r fyne.Resource) (*AnimatedGif, error) {
+func NewEmoteGifFromResource(r fyne.Resource, emote *Emote, clickCallback func(string) error) (*EmoteGif, error) {
+	if g, ok := gifCache[r.Name()]; ok {
+		return g, nil
+	}
 	ret := newGif()
+	ret.emote = emote
+	ret.clickCallback = clickCallback
 
-	return ret, ret.LoadResource(r)
+	res, err := ret, ret.LoadResource(r)
+	gifCache[r.Name()] = ret
+	return res, err
 }
 
 // CreateRenderer loads the widget renderer for this widget. This is an internal requirement for Fyne.
-func (g *AnimatedGif) CreateRenderer() fyne.WidgetRenderer {
+func (g *EmoteGif) CreateRenderer() fyne.WidgetRenderer {
 	return &gifRenderer{gif: g}
 }
 
 // Load is used to change the gif file shown.
 // It will change the loaded content and prepare the new frames for animation.
-func (g *AnimatedGif) Load(u fyne.URI) error {
+func (g *EmoteGif) Load(u fyne.URI) error {
 	g.dst.Image = nil
 	g.dst.Refresh()
 
@@ -73,7 +100,7 @@ func (g *AnimatedGif) Load(u fyne.URI) error {
 
 // LoadResource is used to change the gif resource shown.
 // It will change the loaded content and prepare the new frames for animation.
-func (g *AnimatedGif) LoadResource(r fyne.Resource) error {
+func (g *EmoteGif) LoadResource(r fyne.Resource) error {
 	g.dst.Image = nil
 	g.dst.Refresh()
 
@@ -83,7 +110,7 @@ func (g *AnimatedGif) LoadResource(r fyne.Resource) error {
 	return g.load(bytes.NewReader(r.Content()))
 }
 
-func (g *AnimatedGif) load(read io.Reader) error {
+func (g *EmoteGif) load(read io.Reader) error {
 	pix, err := gif.DecodeAll(read)
 	if err != nil {
 		return err
@@ -98,17 +125,17 @@ func (g *AnimatedGif) load(read io.Reader) error {
 // MinSize returns the minimum size that this GIF can occupy.
 // Because gif images are measured in pixels we cannot use the dimensions, so this defaults to 0x0.
 // You can set a minimum size if required using SetMinSize.
-func (g *AnimatedGif) MinSize() fyne.Size {
+func (g *EmoteGif) MinSize() fyne.Size {
 	return g.min
 }
 
 // SetMinSize sets the smallest possible size that this AnimatedGif should be drawn at.
 // Be careful not to set this based on pixel sizes as that will vary based on output device.
-func (g *AnimatedGif) SetMinSize(min fyne.Size) {
+func (g *EmoteGif) SetMinSize(min fyne.Size) {
 	g.min = min
 }
 
-func (g *AnimatedGif) draw(dst draw.Image, index int) {
+func (g *EmoteGif) draw(dst draw.Image, index int) {
 	defer g.dst.Refresh()
 	if index == 0 {
 		// first frame
@@ -144,7 +171,7 @@ func (g *AnimatedGif) draw(dst draw.Image, index int) {
 }
 
 // Start begins the animation. The speed of the transition is controlled by the loaded gif file.
-func (g *AnimatedGif) Start() {
+func (g *EmoteGif) Start() {
 	if g.isRunning() {
 		return
 	}
@@ -186,7 +213,7 @@ func (g *AnimatedGif) Start() {
 }
 
 // Stop will request that the animation stops running, the last frame will remain visible
-func (g *AnimatedGif) Stop() {
+func (g *EmoteGif) Stop() {
 	if !g.isRunning() {
 		return
 	}
@@ -195,20 +222,26 @@ func (g *AnimatedGif) Stop() {
 	g.runLock.Unlock()
 }
 
-func (g *AnimatedGif) isStopping() bool {
+func (g *EmoteGif) isStopping() bool {
 	g.runLock.RLock()
 	defer g.runLock.RUnlock()
 	return g.stopping
 }
 
-func (g *AnimatedGif) isRunning() bool {
+func (g *EmoteGif) isRunning() bool {
 	g.runLock.RLock()
 	defer g.runLock.RUnlock()
 	return g.running
 }
 
-func newGif() *AnimatedGif {
-	ret := &AnimatedGif{}
+func (g *EmoteGif) Tapped(event *fyne.PointEvent) {
+	if err := g.clickCallback(g.emote.Name + " "); err != nil {
+		log.Println("Error running emote tap callback", err)
+	}
+}
+
+func newGif() *EmoteGif {
+	ret := &EmoteGif{}
 	ret.ExtendBaseWidget(ret)
 	ret.dst = &canvas.Image{}
 	ret.dst.FillMode = canvas.ImageFillContain
@@ -216,7 +249,7 @@ func newGif() *AnimatedGif {
 }
 
 type gifRenderer struct {
-	gif *AnimatedGif
+	gif *EmoteGif
 }
 
 func (g *gifRenderer) Destroy() {
@@ -298,6 +331,10 @@ func main() {
 		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
 		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
 		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
+		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
+		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
+		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
+		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
 		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
 		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
 		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
@@ -310,18 +347,15 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		g, err := NewAnimatedGifFromResource(res)
+		emote := Emote{Id: "asdf", Source: Twitch, Name: "asdf", Animated: true}
+		callback := func(a string) error {
+			println(a)
+			return nil
+		}
+		g, err := NewEmoteGifFromResource(res, &emote, callback)
 		if err != nil {
 			panic(err)
 		}
-		// u, err := storage.ParseURI("https://cdn.7tv.app/emote/651f30352afe76536598abf0/2x.gif")
-		// if err != nil {
-		// 	panic(err)
-		// }
-		// g, err := NewAnimatedGif(u)
-		// if err != nil {
-		// 	panic(err)
-		// }
 		g.Start()
 		c := container.NewWithoutLayout(g)
 		c.Resize(fyne.NewSize(64, 64))
