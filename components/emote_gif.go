@@ -1,4 +1,4 @@
-package main
+package components
 
 import (
 	"bytes"
@@ -366,67 +366,4 @@ func (g *gifRenderer) Objects() []fyne.CanvasObject {
 
 func (g *gifRenderer) Refresh() {
 	g.gif.dst.Refresh()
-}
-
-func main() {
-	myApp := app.New()
-	myWindow := myApp.NewWindow("Visibility Example")
-
-	/*
-		TODO:
-			- [X] Cache images to temp files
-			- [ ] Use the same function to draw all gifs
-			- [ ] Lazy load images
-				- [ ] Return from New immediatly with a temporary blank image with specified size
-				- [ ] On Start, load image
-			- [ ] Try loading from webp for better size and performance
-	*/
-	var emoteIdToAnimated map[string]bool = map[string]bool{
-		"651f30352afe76536598abf0": true,
-		"60a1babb3c3362f9a4b8b33a": true,
-		// "663d3e7efcc4ab2ae6dc0428": false,
-	}
-	imgContainer := container.NewVBox()
-	var emotegifs []*EmoteGif
-
-	for emoteId, animated := range emoteIdToAnimated {
-		tempFile, err := os.CreateTemp("", "")
-		if err != nil {
-			panic(err)
-		}
-		emote := Emote{Id: emoteId, Source: SevenTV, Name: "asdf", Animated: animated, TempFile: tempFile.Name()}
-		tempFile.Close()
-
-		callback := func(a string) error {
-			println(a)
-			return nil
-		}
-		g, err := NewEmoteGif(&emote, callback, true)
-		if err != nil {
-			panic(err)
-		}
-		g.Start()
-		c := container.NewWithoutLayout(g)
-		c.Resize(fyne.NewSize(64, 64))
-		g.Resize(fyne.NewSize(64, 64))
-		imgContainer.Add(c)
-		emotegifs = append(emotegifs, g)
-		imgContainer.Add(widget.NewLabel(" "))
-		imgContainer.Add(widget.NewLabel(" "))
-
-	}
-
-	scrollContainer := container.NewVScroll(imgContainer)
-	scrollContainer.OnScrolled = func(offset fyne.Position) {
-		for _, w := range emotegifs {
-			w.UpdateVisibility(offset, scrollContainer.Size(), scrollContainer.Offset)
-		}
-	}
-
-	// myWindow.SetContent(container.NewAppTabs(
-	// 	container.NewTabItem("Images", scrollContainer),
-	// 	container.NewTabItem("ASD", container.NewVBox()),
-	// ))
-	myWindow.SetContent(scrollContainer)
-	myWindow.ShowAndRun()
 }
