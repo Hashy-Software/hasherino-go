@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"image"
 	"image/draw"
 	"image/gif"
@@ -16,6 +17,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/storage"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -34,6 +36,7 @@ type EmoteGif struct {
 	// custom attributes
 	emote         *Emote
 	clickCallback func(string) error
+	lazyLoad      bool
 }
 
 type EmoteSourceEnum int64
@@ -48,31 +51,100 @@ type Emote struct {
 	Source   EmoteSourceEnum
 	Name     string
 	Animated bool
+	TempFile string
 }
 
-var gifCache = make(map[string]*EmoteGif)
-
-// NewEmoteGif creates a new widget loaded to show the specified image.
-// If there is an error loading the image it will be returned in the error value.
-func NewEmoteGif(u fyne.URI) (*EmoteGif, error) {
-	ret := newGif()
-
-	return ret, ret.Load(u)
-}
-
-// NewEmoteGifFromResource creates a new widget loaded to show the specified image resource.
-// If there is an error loading the image it will be returned in the error value.
-func NewEmoteGifFromResource(r fyne.Resource, emote *Emote, clickCallback func(string) error) (*EmoteGif, error) {
-	if g, ok := gifCache[r.Name()]; ok {
-		return g, nil
+func (e *Emote) GetUrl() (string, error) {
+	var result string
+	switch e.Source {
+	case Twitch:
+		result = "https://static-cdn.jtvnw.net/emoticons/v2/" + e.Id + "/default/dark/2.0"
+	case SevenTV:
+		result = "https://cdn.7tv.app/emote/" + e.Id + "/2x"
+	default:
+		return "", errors.New("Unknown emote source")
 	}
+	return result + e.getUrlExtension(), nil
+}
+
+func (e *Emote) getUrlExtension() string {
+	switch e.Source {
+	case Twitch:
+		return ""
+	case SevenTV:
+		if e.Animated {
+			return ".gif"
+		}
+		return ".png"
+	default:
+		return ".png"
+	}
+}
+
+// NewEmoteGif creates a new widget loaded to show the specified image resource.
+// If there is an error loading the image it will be returned in the error value.
+// If lazyLoad is true, only load the real image when Start() is called
+func NewEmoteGif(emote *Emote, clickCallback func(string) error, lazyLoad bool) (*EmoteGif, error) {
 	ret := newGif()
 	ret.emote = emote
 	ret.clickCallback = clickCallback
+	ret.lazyLoad = lazyLoad
 
-	res, err := ret, ret.LoadResource(r)
-	gifCache[r.Name()] = ret
-	return res, err
+	if lazyLoad {
+		// TODO: replace with empty image
+		return ret, ret.LoadResource(theme.BrokenImageIcon())
+	}
+
+	res, err := tempFileResource(emote)
+	if err != nil {
+		return ret, err
+	}
+	return ret, ret.LoadResource(res)
+}
+
+func tempFileResource(emote *Emote) (*fyne.StaticResource, error) {
+	s, err := os.Stat(emote.TempFile)
+	if err != nil {
+		return nil, err
+	}
+	url, err := emote.GetUrl()
+	if err != nil {
+		return nil, err
+	}
+	// image hasn't been written to tempfile yet
+	if s.Size() == 0 {
+		parsedUri, err := storage.ParseURI(url)
+		if err != nil {
+			return nil, err
+		}
+		read, err := storage.Reader(parsedUri)
+		if err != nil {
+			return nil, err
+		}
+		bytes, err := io.ReadAll(read)
+		if err != nil {
+			return nil, err
+		}
+		err = os.WriteFile(emote.TempFile, bytes, 0666)
+		if err != nil {
+			return nil, err
+		}
+		res := fyne.StaticResource{StaticName: url, StaticContent: bytes}
+		return &res, nil
+	}
+	parsedUri, err := storage.ParseURI("file://" + emote.TempFile)
+	if err != nil {
+		return nil, err
+	}
+	read, err := storage.Reader(parsedUri)
+	if err != nil {
+		return nil, err
+	}
+	bytes, err := io.ReadAll(read)
+	if err != nil {
+		return nil, err
+	}
+	return &fyne.StaticResource{StaticName: url, StaticContent: bytes}, err
 }
 
 // CreateRenderer loads the widget renderer for this widget. This is an internal requirement for Fyne.
@@ -327,32 +399,28 @@ func main() {
 			- [ ] Try loading from webp for better size and performance
 	*/
 	var urls *[]string = &[]string{
-		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
-		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
-		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
-		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
-		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
-		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
-		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
-		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
-		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
-		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
-		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
-		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
+		"651f30352afe76536598abf0",
+		"651f30352afe76536598abf0",
+		"651f30352afe76536598abf0",
+		"60a1babb3c3362f9a4b8b33a",
+		"60a1babb3c3362f9a4b8b33a",
+		"60a1babb3c3362f9a4b8b33a",
 	}
 	imgContainer := container.NewVBox()
 
-	for _, url := range *urls {
-		res, err := ResourceLoader(url)
+	for _, emoteId := range *urls {
+		tempFile, err := os.CreateTemp("", "")
 		if err != nil {
 			panic(err)
 		}
-		emote := Emote{Id: "asdf", Source: Twitch, Name: "asdf", Animated: true}
+		emote := Emote{Id: emoteId, Source: SevenTV, Name: "asdf", Animated: true, TempFile: tempFile.Name()}
+		tempFile.Close()
+
 		callback := func(a string) error {
 			println(a)
 			return nil
 		}
-		g, err := NewEmoteGifFromResource(res, &emote, callback)
+		g, err := NewEmoteGif(&emote, callback, false)
 		if err != nil {
 			panic(err)
 		}
