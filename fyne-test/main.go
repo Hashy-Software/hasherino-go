@@ -6,12 +6,15 @@ import (
 	"image/draw"
 	"image/gif"
 	"io"
+	"log"
+	"os"
 	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/widget"
 )
@@ -236,10 +239,102 @@ func (g *gifRenderer) Refresh() {
 	g.gif.dst.Refresh()
 }
 
+var resourceCache = make(map[string]string)
+
+func ResourceLoader(gifUrl string) (*fyne.StaticResource, error) {
+	var (
+		uri fyne.URI
+		err error
+	)
+
+	if res, ok := resourceCache[gifUrl]; ok {
+		bytes, err := os.ReadFile(res)
+		if err != nil {
+			return nil, err
+		}
+		return fyne.NewStaticResource(gifUrl, bytes), nil
+	} else {
+		uri, err = storage.ParseURI(gifUrl)
+		if err != nil {
+			return nil, err
+		}
+		read, err := storage.Reader(uri)
+		if err != nil {
+			return nil, err
+		}
+		bytes, err := io.ReadAll(read)
+		if err != nil {
+			return nil, err
+		}
+		tempFile, err := os.CreateTemp("", "")
+		if err != nil {
+			return nil, err
+		}
+		err = os.WriteFile(tempFile.Name(), bytes, 0666)
+		if err != nil {
+			return nil, err
+		}
+		resourceCache[gifUrl] = tempFile.Name()
+		log.Println("Caching", gifUrl, "to", tempFile.Name())
+		return &fyne.StaticResource{StaticName: gifUrl, StaticContent: bytes}, nil
+	}
+}
+
 func main() {
 	myApp := app.New()
 	myWindow := myApp.NewWindow("Visibility Example")
 
-	myWindow.Resize(fyne.NewSize(100, 100))
+	/*
+		TODO:
+			- [X] Cache images to temp files
+			- [ ] Use the same function to draw all gifs
+			- [ ] Lazy load images
+				- [ ] Return from New immediatly with a temporary blank image with specified size
+				- [ ] On Start, load image
+			- [ ] Try loading from webp for better size and performance
+	*/
+	var urls *[]string = &[]string{
+		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
+		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
+		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
+		"https://cdn.7tv.app/emote/651f30352afe76536598abf0/4x.gif",
+		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
+		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
+		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
+		"https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif",
+	}
+	imgContainer := container.NewVBox()
+
+	for _, url := range *urls {
+		res, err := ResourceLoader(url)
+		if err != nil {
+			panic(err)
+		}
+		g, err := NewAnimatedGifFromResource(res)
+		if err != nil {
+			panic(err)
+		}
+		// u, err := storage.ParseURI("https://cdn.7tv.app/emote/651f30352afe76536598abf0/2x.gif")
+		// if err != nil {
+		// 	panic(err)
+		// }
+		// g, err := NewAnimatedGif(u)
+		// if err != nil {
+		// 	panic(err)
+		// }
+		g.Start()
+		c := container.NewWithoutLayout(g)
+		c.Resize(fyne.NewSize(64, 64))
+		g.Resize(fyne.NewSize(64, 64))
+		imgContainer.Add(c)
+		imgContainer.Add(widget.NewLabel(" "))
+		imgContainer.Add(widget.NewLabel(" "))
+
+	}
+
+	myWindow.SetContent(container.NewAppTabs(
+		container.NewTabItem("Images", imgContainer),
+		container.NewTabItem("ASD", container.NewVBox()),
+	))
 	myWindow.ShowAndRun()
 }
