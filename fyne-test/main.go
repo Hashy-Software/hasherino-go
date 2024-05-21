@@ -17,7 +17,6 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/storage"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -81,8 +80,7 @@ func (e *Emote) getUrlExtension() string {
 	}
 }
 
-// TODO: replace with alpha image
-var emptyImageResource = theme.BrokenImageIcon()
+var emptyImageResource = &fyne.StaticResource{StaticName: "empty.png", StaticContent: []byte{}}
 
 // NewEmoteGif creates a new widget loaded to show the specified image resource.
 // If there is an error loading the image it will be returned in the error value.
@@ -324,6 +322,20 @@ func (g *EmoteGif) Tapped(event *fyne.PointEvent) {
 	}
 }
 
+func (c *EmoteGif) UpdateVisibility(scrollOffset fyne.Position, scrollSize fyne.Size, containerOffset fyne.Position) {
+	widgetPos := c.Position()
+	widgetSize := c.Size()
+
+	isVisible := widgetPos.Y+widgetSize.Height > scrollOffset.Y &&
+		widgetPos.Y < scrollOffset.Y+scrollSize.Height
+	if isVisible {
+		c.Start()
+	} else {
+		c.Stop()
+	}
+
+}
+
 func newGif() *EmoteGif {
 	ret := &EmoteGif{}
 	ret.ExtendBaseWidget(ret)
@@ -356,47 +368,6 @@ func (g *gifRenderer) Refresh() {
 	g.gif.dst.Refresh()
 }
 
-var resourceCache = make(map[string]string)
-
-func ResourceLoader(gifUrl string) (*fyne.StaticResource, error) {
-	var (
-		uri fyne.URI
-		err error
-	)
-
-	if res, ok := resourceCache[gifUrl]; ok {
-		bytes, err := os.ReadFile(res)
-		if err != nil {
-			return nil, err
-		}
-		return fyne.NewStaticResource(gifUrl, bytes), nil
-	} else {
-		uri, err = storage.ParseURI(gifUrl)
-		if err != nil {
-			return nil, err
-		}
-		read, err := storage.Reader(uri)
-		if err != nil {
-			return nil, err
-		}
-		bytes, err := io.ReadAll(read)
-		if err != nil {
-			return nil, err
-		}
-		tempFile, err := os.CreateTemp("", "")
-		if err != nil {
-			return nil, err
-		}
-		err = os.WriteFile(tempFile.Name(), bytes, 0666)
-		if err != nil {
-			return nil, err
-		}
-		resourceCache[gifUrl] = tempFile.Name()
-		log.Println("Caching", gifUrl, "to", tempFile.Name())
-		return &fyne.StaticResource{StaticName: gifUrl, StaticContent: bytes}, nil
-	}
-}
-
 func main() {
 	myApp := app.New()
 	myWindow := myApp.NewWindow("Visibility Example")
@@ -410,22 +381,20 @@ func main() {
 				- [ ] On Start, load image
 			- [ ] Try loading from webp for better size and performance
 	*/
-	var urls *[]string = &[]string{
-		"651f30352afe76536598abf0",
-		"651f30352afe76536598abf0",
-		"651f30352afe76536598abf0",
-		"60a1babb3c3362f9a4b8b33a",
-		"60a1babb3c3362f9a4b8b33a",
-		"60a1babb3c3362f9a4b8b33a",
+	var emoteIdToAnimated map[string]bool = map[string]bool{
+		"651f30352afe76536598abf0": true,
+		"60a1babb3c3362f9a4b8b33a": true,
+		// "663d3e7efcc4ab2ae6dc0428": false,
 	}
 	imgContainer := container.NewVBox()
+	var emotegifs []*EmoteGif
 
-	for _, emoteId := range *urls {
+	for emoteId, animated := range emoteIdToAnimated {
 		tempFile, err := os.CreateTemp("", "")
 		if err != nil {
 			panic(err)
 		}
-		emote := Emote{Id: emoteId, Source: SevenTV, Name: "asdf", Animated: true, TempFile: tempFile.Name()}
+		emote := Emote{Id: emoteId, Source: SevenTV, Name: "asdf", Animated: animated, TempFile: tempFile.Name()}
 		tempFile.Close()
 
 		callback := func(a string) error {
@@ -441,14 +410,23 @@ func main() {
 		c.Resize(fyne.NewSize(64, 64))
 		g.Resize(fyne.NewSize(64, 64))
 		imgContainer.Add(c)
+		emotegifs = append(emotegifs, g)
 		imgContainer.Add(widget.NewLabel(" "))
 		imgContainer.Add(widget.NewLabel(" "))
 
 	}
 
-	myWindow.SetContent(container.NewAppTabs(
-		container.NewTabItem("Images", imgContainer),
-		container.NewTabItem("ASD", container.NewVBox()),
-	))
+	scrollContainer := container.NewVScroll(imgContainer)
+	scrollContainer.OnScrolled = func(offset fyne.Position) {
+		for _, w := range emotegifs {
+			w.UpdateVisibility(offset, scrollContainer.Size(), scrollContainer.Offset)
+		}
+	}
+
+	// myWindow.SetContent(container.NewAppTabs(
+	// 	container.NewTabItem("Images", scrollContainer),
+	// 	container.NewTabItem("ASD", container.NewVBox()),
+	// ))
+	myWindow.SetContent(scrollContainer)
 	myWindow.ShowAndRun()
 }
