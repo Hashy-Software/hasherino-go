@@ -81,6 +81,9 @@ func (e *Emote) getUrlExtension() string {
 	}
 }
 
+// TODO: replace with alpha image
+var emptyImageResource = theme.BrokenImageIcon()
+
 // NewEmoteGif creates a new widget loaded to show the specified image resource.
 // If there is an error loading the image it will be returned in the error value.
 // If lazyLoad is true, only load the real image when Start() is called
@@ -91,8 +94,7 @@ func NewEmoteGif(emote *Emote, clickCallback func(string) error, lazyLoad bool) 
 	ret.lazyLoad = lazyLoad
 
 	if lazyLoad {
-		// TODO: replace with empty image
-		return ret, ret.LoadResource(theme.BrokenImageIcon())
+		return ret, ret.LoadResource(emptyImageResource)
 	}
 
 	res, err := tempFileResource(emote)
@@ -248,6 +250,13 @@ func (g *EmoteGif) Start() {
 		return
 	}
 	g.runLock.Lock()
+	if g.lazyLoad {
+		res, err := tempFileResource(g.emote)
+		if err != nil {
+			panic(err)
+		}
+		g.LoadResource(res)
+	}
 	g.running = true
 	g.runLock.Unlock()
 
@@ -267,6 +276,9 @@ func (g *EmoteGif) Start() {
 		for g.remaining != 0 {
 			for c := range g.src.Image {
 				if g.isStopping() {
+					if g.lazyLoad {
+						g.LoadResource(emptyImageResource)
+					}
 					break loop
 				}
 				g.draw(buffer, c)
@@ -420,7 +432,7 @@ func main() {
 			println(a)
 			return nil
 		}
-		g, err := NewEmoteGif(&emote, callback, false)
+		g, err := NewEmoteGif(&emote, callback, true)
 		if err != nil {
 			panic(err)
 		}
