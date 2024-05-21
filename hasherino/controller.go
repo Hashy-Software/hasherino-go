@@ -213,6 +213,11 @@ func (hc *HasherinoController) AddTempTabs(channelIds *[]string) error {
 				} else {
 					emoteObjs := []Emote{}
 					for _, emote := range emotes.Data.EmoteSet.Emotes {
+						tempFile, err := os.CreateTemp("", "")
+						if err != nil {
+							log.Printf("Failed to create temp file %s for 7tv emote %s", err, emote.Name)
+							continue
+						}
 						emoteObjs = append(emoteObjs, Emote{
 							Id:        emote.ID,
 							Source:    SevenTV,
@@ -221,7 +226,9 @@ func (hc *HasherinoController) AddTempTabs(channelIds *[]string) error {
 							ChannelID: nil,
 							OwnerID:   "",
 							Owner:     nil,
+							TempFile:  tempFile.Name(),
 						})
+						tempFile.Close()
 					}
 					log.Println("Loaded " + strconv.Itoa(len(emoteObjs)) + " 7tv global emotes")
 					result := tx.Create(&emoteObjs)
@@ -260,6 +267,11 @@ func (hc *HasherinoController) AddTempTabs(channelIds *[]string) error {
 					emoteObjs := []Emote{}
 					if len(stvUser.Data.UserByConnection.EmoteSets) > 0 {
 						for _, emote := range stvUser.Data.UserByConnection.EmoteSets[0].Emotes {
+							tempFile, err := os.CreateTemp("", "")
+							if err != nil {
+								log.Printf("Failed to create temp file %s for 7tv emote %s", err, emote.Data.Name)
+								continue
+							}
 							e := Emote{
 								Id:        emote.Data.ID,
 								Source:    SevenTV,
@@ -268,7 +280,9 @@ func (hc *HasherinoController) AddTempTabs(channelIds *[]string) error {
 								ChannelID: &channelId,
 								OwnerID:   "",
 								Owner:     nil,
+								TempFile:  tempFile.Name(),
 							}
+							tempFile.Close()
 							emoteObjs = append(emoteObjs, e)
 						}
 					}

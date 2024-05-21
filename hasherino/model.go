@@ -71,16 +71,14 @@ func (c *ChatUserTempTab) AfterDelete(tx *gorm.DB) (err error) {
 }
 
 type Emote struct {
-	Id       string          `gorm:"primaryKey"`
-	Source   EmoteSourceEnum `gorm:"primaryKey"`
-	Name     string
-	Animated bool
-	// if a channel is set, only renders in that channel
-	ChannelID *string `gorm:"primaryKey"`
-	// Foreign key field
-	OwnerID string `gorm:"primaryKey;index"`
-	// if an owner is set, only renders when the message sender is the owner
-	Owner *ChatUser `gorm:"foreignKey:OwnerID;references:Id"`
+	Id        string          `gorm:"primaryKey"`
+	Source    EmoteSourceEnum `gorm:"primaryKey"`
+	Name      string
+	Animated  bool
+	ChannelID *string   `gorm:"primaryKey"`                       // if a channel is set, only renders in that channel
+	OwnerID   string    `gorm:"primaryKey;index"`                 // Foreign key field
+	Owner     *ChatUser `gorm:"foreignKey:OwnerID;references:Id"` // if an owner is set, only renders when the message sender is the owner
+	TempFile  string
 }
 
 func (e *Emote) GetUrl() (string, error) {
