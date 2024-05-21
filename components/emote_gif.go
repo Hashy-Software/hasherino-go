@@ -165,6 +165,12 @@ func (g *EmoteGif) SetMinSize(min fyne.Size) {
 
 func (g *EmoteGif) draw(dst draw.Image, index int) {
 	defer g.dst.Refresh()
+	if g.src == nil || g.src.Image == nil || len(g.src.Image) == 0 {
+		return
+	}
+	if g.dst == nil || g.dst.Image == nil {
+		return
+	}
 	if index == 0 {
 		// first frame
 		draw.Draw(dst, g.dst.Image.Bounds(), g.src.Image[index], image.Point{}, draw.Src)
@@ -203,17 +209,26 @@ func (g *EmoteGif) Start() {
 	if g.isRunning() {
 		return
 	}
-	g.runLock.Lock()
-	if g.lazyLoad {
+	if g.lazyLoad && g.src == nil {
 		res, err := tempFileResource(g.emote)
 		if err != nil {
-			panic(err)
+			log.Println("Error loading lazy gif", err)
+			g.LoadResource(emptyImageResource)
+		} else {
+			err = g.LoadResource(res)
+			if err != nil {
+				log.Println("Error loading lazy gif", err)
+				g.LoadResource(emptyImageResource)
+			}
 		}
-		g.LoadResource(res)
 	}
+	g.runLock.Lock()
 	g.running = true
 	g.runLock.Unlock()
 
+	if g.dst.Image == nil || g.src.Image == nil {
+		return
+	}
 	buffer := image.NewNRGBA(g.dst.Image.Bounds())
 	g.draw(buffer, 0)
 

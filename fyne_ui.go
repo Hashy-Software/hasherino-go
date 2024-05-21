@@ -347,8 +347,12 @@ func NewChatTab(
 				defer wg.Done()
 
 				for _, emote := range emoteSlice {
+					if !emote.Animated { // TODO: remove
+						continue
+					}
 					imgCanvas, err := components.NewEmoteGif(emote, func(text string) error {
-						msgEntry.SetText(text + msgEntry.Text + " ")
+						msgEntry.SetText(msgEntry.Text + text + " ")
+						newWindow.Close()
 						return nil
 					}, true)
 					if err != nil {
@@ -363,9 +367,28 @@ func NewChatTab(
 		}
 		wg.Wait()
 		grid := container.NewGridWrap(defaultEmoteSize, images...)
+		stvScroll := container.NewScroll(grid)
+		stvScroll.OnScrolled = func(scrollOffset fyne.Position) {
+			for _, comp := range images {
+				go func(comp fyne.CanvasObject) {
+					w := comp.(*components.EmoteGif)
+					scrollSize := stvScroll.Size()
+					widgetPos := w.Position()
+					widgetSize := w.Size()
+					isVisible := widgetPos.Y+widgetSize.Height > scrollOffset.Y &&
+						widgetPos.Y < scrollOffset.Y+scrollSize.Height
+					if isVisible {
+						w.Start()
+					} else {
+						w.Stop()
+					}
+				}(comp)
+			}
+		}
+
 		accordion := widget.NewAccordion(
 			widget.NewAccordionItem("Twitch Emotes", widget.NewLabel("Not implemented")),
-			widget.NewAccordionItem("7TV Emotes"+strings.Repeat(" ", 80), container.NewScroll(grid)),
+			widget.NewAccordionItem("7TV Emotes"+strings.Repeat(" ", 80), stvScroll),
 			widget.NewAccordionItem("FFZ Emotes", widget.NewLabel("Not implemented")),
 			widget.NewAccordionItem("BTTV Emotes", widget.NewLabel("Not implemented")),
 			widget.NewAccordionItem("Emoji", widget.NewLabel("Not implemented")),
