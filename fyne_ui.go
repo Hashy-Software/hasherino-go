@@ -21,6 +21,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
+	"github.com/Hashy-Software/hasherino-go/components"
 	"github.com/Hashy-Software/hasherino-go/hasherino"
 )
 
@@ -198,12 +199,6 @@ func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *containe
 	return tabs
 }
 
-// type EmoteWidget struct {
-// 	fyne.Tappable
-//
-// 	Emote *fyne.CanvasObject
-// }
-
 func NewEmoteCanvasObject(emote *hasherino.Emote) (*fyne.CanvasObject, error) {
 	url, err := emote.GetUrl()
 	if err != nil {
@@ -352,13 +347,16 @@ func NewChatTab(
 				defer wg.Done()
 
 				for _, emote := range emoteSlice {
-					imgCanvas, err := NewEmoteCanvasObject(emote)
+					imgCanvas, err := components.NewEmoteGif(emote, func(text string) error {
+						msgEntry.SetText(text + msgEntry.Text + " ")
+						return nil
+					}, true)
 					if err != nil {
 						log.Println(err)
 						continue
 					}
 					mutex.Lock()
-					images = append(images, *imgCanvas)
+					images = append(images, imgCanvas)
 					mutex.Unlock()
 				}
 			}(emoteSlice)

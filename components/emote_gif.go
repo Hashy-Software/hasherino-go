@@ -2,7 +2,6 @@ package components
 
 import (
 	"bytes"
-	"errors"
 	"image"
 	"image/draw"
 	"image/gif"
@@ -13,11 +12,10 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/widget"
+	"github.com/Hashy-Software/hasherino-go/hasherino"
 )
 
 // EmoteGif widget shows a Gif image with many frames.
@@ -33,51 +31,9 @@ type EmoteGif struct {
 	runLock           sync.RWMutex
 
 	// custom attributes
-	emote         *Emote
+	emote         *hasherino.Emote
 	clickCallback func(string) error
 	lazyLoad      bool
-}
-
-type EmoteSourceEnum int64
-
-const (
-	Twitch EmoteSourceEnum = iota
-	SevenTV
-)
-
-type Emote struct {
-	Id       string
-	Source   EmoteSourceEnum
-	Name     string
-	Animated bool
-	TempFile string
-}
-
-func (e *Emote) GetUrl() (string, error) {
-	var result string
-	switch e.Source {
-	case Twitch:
-		result = "https://static-cdn.jtvnw.net/emoticons/v2/" + e.Id + "/default/dark/2.0"
-	case SevenTV:
-		result = "https://cdn.7tv.app/emote/" + e.Id + "/2x"
-	default:
-		return "", errors.New("Unknown emote source")
-	}
-	return result + e.getUrlExtension(), nil
-}
-
-func (e *Emote) getUrlExtension() string {
-	switch e.Source {
-	case Twitch:
-		return ""
-	case SevenTV:
-		if e.Animated {
-			return ".gif"
-		}
-		return ".png"
-	default:
-		return ".png"
-	}
 }
 
 var emptyImageResource = &fyne.StaticResource{StaticName: "empty.png", StaticContent: []byte{}}
@@ -85,7 +41,7 @@ var emptyImageResource = &fyne.StaticResource{StaticName: "empty.png", StaticCon
 // NewEmoteGif creates a new widget loaded to show the specified image resource.
 // If there is an error loading the image it will be returned in the error value.
 // If lazyLoad is true, only load the real image when Start() is called
-func NewEmoteGif(emote *Emote, clickCallback func(string) error, lazyLoad bool) (*EmoteGif, error) {
+func NewEmoteGif(emote *hasherino.Emote, clickCallback func(string) error, lazyLoad bool) (*EmoteGif, error) {
 	ret := newGif()
 	ret.emote = emote
 	ret.clickCallback = clickCallback
@@ -102,7 +58,7 @@ func NewEmoteGif(emote *Emote, clickCallback func(string) error, lazyLoad bool) 
 	return ret, ret.LoadResource(res)
 }
 
-func tempFileResource(emote *Emote) (*fyne.StaticResource, error) {
+func tempFileResource(emote *hasherino.Emote) (*fyne.StaticResource, error) {
 	s, err := os.Stat(emote.TempFile)
 	if err != nil {
 		return nil, err

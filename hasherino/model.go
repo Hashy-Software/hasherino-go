@@ -91,10 +91,10 @@ func (e *Emote) GetUrl() (string, error) {
 	default:
 		return "", errors.New("Unknown emote source")
 	}
-	return result + e.getUrlExtension(), nil
+	return result + e.GetUrlExtension(), nil
 }
 
-func (e *Emote) getUrlExtension() string {
+func (e *Emote) GetUrlExtension() string {
 	switch e.Source {
 	case Twitch:
 		return ""
