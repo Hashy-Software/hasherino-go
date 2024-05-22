@@ -286,6 +286,7 @@ type STVUserJson struct {
 				ID     string `json:"id"`
 				Name   string `json:"name"`
 				Emotes []struct {
+					Name string `json:"name"`
 					Data struct {
 						ID       string `json:"id"`
 						Name     string `json:"name"`
@@ -314,6 +315,7 @@ func STVGetUser(userId string) (*STVUserJson, error) {
             				id
             				name
             				emotes {
+    										name
                 				data {
                     				id
                     				name

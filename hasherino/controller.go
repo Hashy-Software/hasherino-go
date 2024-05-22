@@ -275,7 +275,7 @@ func (hc *HasherinoController) AddTempTabs(channelIds *[]string) error {
 							e := Emote{
 								Id:        emote.Data.ID,
 								Source:    SevenTV,
-								Name:      emote.Data.Name,
+								Name:      emote.Name,
 								Animated:  emote.Data.Animated,
 								ChannelID: &channelId,
 								OwnerID:   "",
