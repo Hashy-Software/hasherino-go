@@ -321,14 +321,13 @@ func NewChatTab(
 		newWindow := fyne.CurrentApp().NewWindow("Select emote")
 		newWindow.Resize(fyne.NewSize(300, 300))
 		newWindow.SetContent(container.NewCenter(widget.NewLabel("Loading...")))
-		newWindow.Show()
 
-		loadEmoteSearch := func(search string) *widget.Accordion {
+		loadEmoteSearch := func(search string) (*widget.Accordion, error) {
 
 			emotes, err := getEmotes(search)
 			if err != nil {
 				dialog.ShowError(err, window)
-				return nil
+				return nil, err
 			}
 
 			var images []fyne.CanvasObject
@@ -353,7 +352,7 @@ func NewChatTab(
 							msgEntry.SetText(msgEntry.Text + text + " ")
 							newWindow.Close()
 							return nil
-						}, true)
+						})
 						if err != nil {
 							log.Println(err)
 							continue
@@ -399,17 +398,19 @@ func NewChatTab(
 				widget.NewAccordionItem("BTTV Emotes", widget.NewLabel("Not implemented")),
 				widget.NewAccordionItem("Emoji", widget.NewLabel("Not implemented")),
 			)
-			return accordion
+			return accordion, nil
 		}
 
 		searchEntry := widget.NewEntry()
 		searchEntry.SetPlaceHolder("Emote name")
 		searchEntry.OnChanged = func(s string) {
-			accordion := loadEmoteSearch(s)
-			if accordion == nil {
+			accordion, err := loadEmoteSearch(s)
+			if err != nil {
+				dialog.ShowError(err, window)
 				return
 			}
 			newWindow.SetContent(container.NewBorder(searchEntry, nil, nil, nil, accordion))
+			newWindow.Show()
 		}
 		searchEntry.OnChanged("")
 

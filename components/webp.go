@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"image"
 	"io"
+	"log"
 
 	"github.com/Hashy-Software/hasherino-go/hasherino"
 	"golang.org/x/image/webp"
@@ -20,14 +21,16 @@ type WebpWidget struct {
 	widget.BaseWidget
 	min fyne.Size
 
-	dst   *canvas.Image
-	emote *hasherino.Emote
+	dst           *canvas.Image
+	emote         *hasherino.Emote
+	clickCallback func(string) error
 }
 
-func NewWebpWidget(emote *hasherino.Emote) (*WebpWidget, error) {
+func NewWebpWidget(emote *hasherino.Emote, clickCallback func(string) error) (*WebpWidget, error) {
 	ret := newAnimatedGif()
 	ret.loadEmptyDst()
 	ret.emote = emote
+	ret.clickCallback = clickCallback
 	return ret, nil
 }
 
@@ -124,4 +127,10 @@ func (g *WebpWidget) LazyLoad() error {
 func (g *WebpWidget) LazyUnload() error {
 	g.loadEmptyDst()
 	return nil
+}
+
+func (g *WebpWidget) Tapped(event *fyne.PointEvent) {
+	if err := g.clickCallback(g.emote.Name + " "); err != nil {
+		log.Println("Error running emote tap callback", err)
+	}
 }
