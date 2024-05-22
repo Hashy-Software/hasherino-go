@@ -273,30 +273,56 @@ func GetChatHistory(channel string, limit int) (*[]ChatMessage, error) {
 
 }
 
+type EmoteSet struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Emotes []struct {
+		Name string `json:"name"`
+		Data struct {
+			ID       string `json:"id"`
+			Name     string `json:"name"`
+			Animated bool   `json:"animated"`
+			Listed   bool   `json:"listed"`
+		} `json:"data"`
+	} `json:"emotes"`
+}
+
 type STVUserJson struct {
 	Data struct {
 		UserByConnection struct {
-			ID          string    `json:"id"`
-			Username    string    `json:"username"`
-			DisplayName string    `json:"display_name"`
-			CreatedAt   time.Time `json:"created_at"`
-			AvatarURL   string    `json:"avatar_url"`
-			Biography   string    `json:"biography"`
-			EmoteSets   []struct {
-				ID     string `json:"id"`
-				Name   string `json:"name"`
-				Emotes []struct {
-					Name string `json:"name"`
-					Data struct {
-						ID       string `json:"id"`
-						Name     string `json:"name"`
-						Animated bool   `json:"animated"`
-						Listed   bool   `json:"listed"`
-					} `json:"data"`
-				} `json:"emotes"`
-			} `json:"emote_sets"`
+			ID          string     `json:"id"`
+			Username    string     `json:"username"`
+			DisplayName string     `json:"display_name"`
+			CreatedAt   time.Time  `json:"created_at"`
+			AvatarURL   string     `json:"avatar_url"`
+			Biography   string     `json:"biography"`
+			EmoteSets   []EmoteSet `json:"emote_sets"`
+			Connections []struct {
+				Platform   string `json:"platform"`
+				EmoteSetID string `json:"emote_set_id"`
+			} `json:"connections"`
 		} `json:"userByConnection"`
 	} `json:"data"`
+}
+
+func (s *STVUserJson) DefaultEmoteSet() (*EmoteSet, error) {
+	var defaultSetId *string = nil
+	for _, connection := range s.Data.UserByConnection.Connections {
+		if connection.Platform == "TWITCH" {
+			defaultSetId = &connection.EmoteSetID
+			break
+		}
+	}
+	if defaultSetId == nil {
+		return nil, errors.New("Failed to find twitch connection")
+	}
+
+	for _, emoteSet := range s.Data.UserByConnection.EmoteSets {
+		if emoteSet.ID == *defaultSetId {
+			return &emoteSet, nil
+		}
+	}
+	return nil, errors.New("Failed to find default emote set")
 }
 
 func STVGetUser(userId string) (*STVUserJson, error) {
@@ -323,6 +349,10 @@ func STVGetUser(userId string) (*STVUserJson, error) {
                     				listed
                 				}
             				}
+        				}
+    						connections {
+            				platform
+            				emote_set_id
         				}
       }
   }`,

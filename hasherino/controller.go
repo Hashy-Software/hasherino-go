@@ -266,7 +266,12 @@ func (hc *HasherinoController) AddTempTabs(channelIds *[]string) error {
 
 					emoteObjs := []Emote{}
 					if len(stvUser.Data.UserByConnection.EmoteSets) > 0 {
-						for _, emote := range stvUser.Data.UserByConnection.EmoteSets[0].Emotes {
+						emoteSet, err := stvUser.DefaultEmoteSet()
+						if err != nil {
+							log.Printf("Failed to load default 7tv emote set: %s", err)
+							continue
+						}
+						for _, emote := range emoteSet.Emotes {
 							tempFile, err := os.CreateTemp("", "")
 							if err != nil {
 								log.Printf("Failed to create temp file %s for 7tv emote %s", err, emote.Data.Name)
