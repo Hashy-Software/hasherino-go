@@ -347,10 +347,7 @@ func NewChatTab(
 				defer wg.Done()
 
 				for _, emote := range emoteSlice {
-					if !emote.Animated { // TODO: remove
-						continue
-					}
-					imgCanvas, err := components.NewEmoteGif(emote, func(text string) error {
+					imgCanvas, err := components.NewEmote(emote, func(text string) error {
 						msgEntry.SetText(msgEntry.Text + text + " ")
 						newWindow.Close()
 						return nil
@@ -371,16 +368,16 @@ func NewChatTab(
 		stvScroll.OnScrolled = func(scrollOffset fyne.Position) {
 			for _, comp := range images {
 				go func(comp fyne.CanvasObject) {
-					w := comp.(*components.EmoteGif)
+					w := comp.(components.LazyLoadedWidget)
 					scrollSize := stvScroll.Size()
 					widgetPos := w.Position()
 					widgetSize := w.Size()
 					isVisible := widgetPos.Y+widgetSize.Height > scrollOffset.Y &&
 						widgetPos.Y < scrollOffset.Y+scrollSize.Height
 					if isVisible {
-						w.Start()
+						w.LazyLoad()
 					} else {
-						w.Stop()
+						w.LazyUnload()
 					}
 				}(comp)
 			}

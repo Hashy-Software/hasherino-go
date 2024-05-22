@@ -132,6 +132,9 @@ func (g *EmoteGif) draw(dst draw.Image, index int) {
 		return
 	}
 
+	if index >= len(g.src.Disposal) {
+		return
+	}
 	switch g.src.Disposal[index-1] {
 	case gif.DisposalNone:
 		// Do not dispose old frame, draw new frame over old
@@ -158,6 +161,7 @@ func (g *EmoteGif) draw(dst draw.Image, index int) {
 }
 
 func (g *EmoteGif) loadEmpty() {
+	g.src = &gif.GIF{}
 	g.src.Image = []*image.Paletted{image.NewPaletted(image.Rect(0, 0, 1, 1), palette.Plan9)}
 	g.src.Disposal = []byte{gif.DisposalNone}
 	g.src.LoopCount = -1
@@ -211,6 +215,9 @@ func (g *EmoteGif) Start() {
 				}
 				g.draw(buffer, c)
 
+				if g.src == nil || c >= len(g.src.Delay) {
+					break loop
+				}
 				time.Sleep(time.Millisecond * time.Duration(g.src.Delay[c]) * 10)
 			}
 			if g.remaining > -1 { // don't underflow int
