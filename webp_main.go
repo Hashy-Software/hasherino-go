@@ -12,7 +12,7 @@ import (
 func main() {
 	app := app.New()
 	w := app.NewWindow("Animated GIF")
-	uri, err := storage.ParseURI("https://cdn.7tv.app/emote/60a1babb3c3362f9a4b8b33a/4x.gif")
+	uri, err := storage.ParseURI("https://cdn.7tv.app/emote/663d3e7efcc4ab2ae6dc0428/4x.webp")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -20,7 +20,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	g.Start()
 	w.SetContent(g)
 	w.Resize(fyne.NewSize(300, 300))
 	w.ShowAndRun()
