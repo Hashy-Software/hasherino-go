@@ -320,7 +320,7 @@ func (hc *HasherinoController) AddTempTabs(channelIds *[]string) error {
 	return err
 }
 
-func (hc *HasherinoController) GetEmotes() ([]*Emote, error) {
+func (hc *HasherinoController) GetEmotes(search string) ([]*Emote, error) {
 	emotes := []*Emote{}
 	err := hc.memDB.Transaction(func(tx *gorm.DB) error {
 		tab := &Tab{}
@@ -333,8 +333,9 @@ func (hc *HasherinoController) GetEmotes() ([]*Emote, error) {
 		if result.Error != nil {
 			return result.Error
 		}
-		query := "(owner_id = ? OR owner_id IS ?) AND (channel_id = ? OR channel_id IS NULL)"
-		result = tx.Where(query, activeAccount.Id, "", tab.Id).Find(&emotes)
+		query := "(owner_id = ? OR owner_id IS ?) AND (channel_id = ? OR channel_id IS NULL) AND (name LIKE ?)"
+		search = "%" + search + "%"
+		result = tx.Where(query, activeAccount.Id, "", tab.Id, search).Find(&emotes)
 		log.Println("Query found " + strconv.Itoa(len(emotes)) + " emotes for tab " + tab.Login)
 		if result.Error != nil {
 			return result.Error

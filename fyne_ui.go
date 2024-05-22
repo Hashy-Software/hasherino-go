@@ -231,7 +231,7 @@ func NewEmoteCanvasObject(emote *hasherino.Emote) (*fyne.CanvasObject, error) {
 func NewChatTab(
 	channel string,
 	sendMsg func(string) (string, error),
-	getEmotes func() ([]*hasherino.Emote, error),
+	getEmotes func(string) ([]*hasherino.Emote, error),
 	window fyne.Window,
 	settingsFunc func() (*hasherino.AppSettings, error),
 ) *container.TabItem {
@@ -318,79 +318,101 @@ func NewChatTab(
 		messageList.Refresh()
 	}
 	content := container.NewBorder(nil, container.NewBorder(nil, nil, nil, widget.NewButton("😃", func() {
-		emotes, err := getEmotes()
-		if err != nil {
-			dialog.ShowError(err, window)
-			return
-		}
-
 		newWindow := fyne.CurrentApp().NewWindow("Select emote")
 		newWindow.Resize(fyne.NewSize(300, 300))
 		newWindow.SetContent(container.NewCenter(widget.NewLabel("Loading...")))
 		newWindow.Show()
 
-		var images []fyne.CanvasObject
-		mutex := sync.Mutex{}
+		loadEmoteSearch := func(search string) *widget.Accordion {
 
-		fourth := len(emotes) / 4
-		emoteSlices := [][]*hasherino.Emote{
-			emotes[:fourth],
-			emotes[fourth : 2*fourth],
-			emotes[2*fourth : 3*fourth],
-			emotes[3*fourth:],
-		}
-		var wg sync.WaitGroup
-
-		for _, emoteSlice := range emoteSlices {
-			wg.Add(1)
-			go func(emoteSlice []*hasherino.Emote) {
-				defer wg.Done()
-
-				for _, emote := range emoteSlice {
-					imgCanvas, err := components.NewEmote(emote, func(text string) error {
-						msgEntry.SetText(msgEntry.Text + text + " ")
-						newWindow.Close()
-						return nil
-					}, true)
-					if err != nil {
-						log.Println(err)
-						continue
-					}
-					mutex.Lock()
-					images = append(images, imgCanvas)
-					mutex.Unlock()
-				}
-			}(emoteSlice)
-		}
-		wg.Wait()
-		grid := container.NewGridWrap(defaultEmoteSize, images...)
-		stvScroll := container.NewScroll(grid)
-		stvScroll.OnScrolled = func(scrollOffset fyne.Position) {
-			for _, comp := range images {
-				go func(comp fyne.CanvasObject) {
-					w := comp.(components.LazyLoadedWidget)
-					scrollSize := stvScroll.Size()
-					widgetPos := w.Position()
-					widgetSize := w.Size()
-					isVisible := widgetPos.Y+widgetSize.Height > scrollOffset.Y &&
-						widgetPos.Y < scrollOffset.Y+scrollSize.Height
-					if isVisible {
-						w.LazyLoad()
-					} else {
-						w.LazyUnload()
-					}
-				}(comp)
+			emotes, err := getEmotes(search)
+			if err != nil {
+				dialog.ShowError(err, window)
+				return nil
 			}
+
+			var images []fyne.CanvasObject
+			mutex := sync.Mutex{}
+
+			fourth := len(emotes) / 4
+			emoteSlices := [][]*hasherino.Emote{
+				emotes[:fourth],
+				emotes[fourth : 2*fourth],
+				emotes[2*fourth : 3*fourth],
+				emotes[3*fourth:],
+			}
+			var wg sync.WaitGroup
+
+			for _, emoteSlice := range emoteSlices {
+				wg.Add(1)
+				go func(emoteSlice []*hasherino.Emote) {
+					defer wg.Done()
+
+					for _, emote := range emoteSlice {
+						imgCanvas, err := components.NewEmote(emote, func(text string) error {
+							msgEntry.SetText(msgEntry.Text + text + " ")
+							newWindow.Close()
+							return nil
+						}, true)
+						if err != nil {
+							log.Println(err)
+							continue
+						}
+						mutex.Lock()
+						images = append(images, imgCanvas)
+						mutex.Unlock()
+					}
+				}(emoteSlice)
+			}
+			wg.Wait()
+			grid := container.NewGridWrap(defaultEmoteSize, images...)
+			stvScroll := container.NewScroll(grid)
+			stvScroll.OnScrolled = func(scrollOffset fyne.Position) {
+				for _, comp := range images {
+					go func(comp fyne.CanvasObject) {
+						w := comp.(components.LazyLoadedWidget)
+						scrollSize := stvScroll.Size()
+						widgetPos := w.Position()
+						widgetSize := w.Size()
+						isVisible := widgetPos.Y+widgetSize.Height > scrollOffset.Y &&
+							widgetPos.Y < scrollOffset.Y+scrollSize.Height
+						if isVisible {
+							w.LazyLoad()
+						} else {
+							w.LazyUnload()
+						}
+					}(comp)
+				}
+			}
+			// Load the first 40 images
+			// TODO: work for each accordion item
+			start, end := 0, min(40, len(images))
+			for i := start; i < end; i++ {
+				go func() {
+					images[i].(components.LazyLoadedWidget).LazyLoad()
+				}()
+			}
+			accordion := widget.NewAccordion(
+				widget.NewAccordionItem("Twitch Emotes", widget.NewLabel("Not implemented")),
+				widget.NewAccordionItem("7TV Emotes"+strings.Repeat(" ", 80), stvScroll),
+				widget.NewAccordionItem("FFZ Emotes", widget.NewLabel("Not implemented")),
+				widget.NewAccordionItem("BTTV Emotes", widget.NewLabel("Not implemented")),
+				widget.NewAccordionItem("Emoji", widget.NewLabel("Not implemented")),
+			)
+			return accordion
 		}
 
-		accordion := widget.NewAccordion(
-			widget.NewAccordionItem("Twitch Emotes", widget.NewLabel("Not implemented")),
-			widget.NewAccordionItem("7TV Emotes"+strings.Repeat(" ", 80), stvScroll),
-			widget.NewAccordionItem("FFZ Emotes", widget.NewLabel("Not implemented")),
-			widget.NewAccordionItem("BTTV Emotes", widget.NewLabel("Not implemented")),
-			widget.NewAccordionItem("Emoji", widget.NewLabel("Not implemented")),
-		)
-		newWindow.SetContent(accordion)
+		searchEntry := widget.NewEntry()
+		searchEntry.SetPlaceHolder("Emote name")
+		searchEntry.OnChanged = func(s string) {
+			accordion := loadEmoteSearch(s)
+			if accordion == nil {
+				return
+			}
+			newWindow.SetContent(container.NewBorder(searchEntry, nil, nil, nil, accordion))
+		}
+		searchEntry.OnChanged("")
+
 	}), msgEntry), nil, nil, messageList)
 	return container.NewTabItem(channel, content)
 }
