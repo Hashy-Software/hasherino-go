@@ -5,7 +5,6 @@ import (
 
 	"context"
 	"fmt"
-	"io"
 	"nhooyr.io/websocket"
 )
 
@@ -78,13 +77,13 @@ func (w *TwitchChatWebsocket) Listen(callback func(message string)) error {
 
 	for {
 		_, content, err := w.connection.Read(w.context)
-		if err != nil && err != io.EOF {
-			fmt.Println("Error:", err)
-			break
-		}
-		if err == io.EOF {
+		if len(content) == 0 {
 			fmt.Println("EOF, continuing")
 			continue
+		}
+		if err != nil {
+			fmt.Println("Error:", err)
+			break
 		}
 		s := string(content)
 		fmt.Println("Message: " + s)
