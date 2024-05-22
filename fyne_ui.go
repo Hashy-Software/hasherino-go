@@ -26,7 +26,7 @@ import (
 )
 
 var callbackMap = make(map[string]func(hasherino.ChatMessage))
-var defaultEmoteSize = fyne.NewSize(32, 32)
+var defaultEmoteSize = fyne.NewSize(45, 45)
 
 func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *container.AppTabs {
 	// Accounts tab
@@ -319,7 +319,7 @@ func NewChatTab(
 	}
 	content := container.NewBorder(nil, container.NewBorder(nil, nil, nil, widget.NewButton("😃", func() {
 		newWindow := fyne.CurrentApp().NewWindow("Select emote")
-		newWindow.Resize(fyne.NewSize(300, 300))
+		newWindow.Resize(fyne.NewSize(300, 600))
 		newWindow.SetContent(container.NewCenter(widget.NewLabel("Loading...")))
 
 		loadEmoteSearch := func(search string) (*widget.Accordion, error) {
@@ -383,9 +383,9 @@ func NewChatTab(
 					}(comp)
 				}
 			}
-			// Load the first 40 images
+			// Load the first 60 images
 			// TODO: work for each accordion item
-			start, end := 0, min(40, len(images))
+			start, end := 0, min(60, len(images))
 			for i := start; i < end; i++ {
 				go func() {
 					images[i].(components.LazyLoadedWidget).LazyLoad()
@@ -398,6 +398,7 @@ func NewChatTab(
 				widget.NewAccordionItem("BTTV Emotes", widget.NewLabel("Not implemented")),
 				widget.NewAccordionItem("Emoji", widget.NewLabel("Not implemented")),
 			)
+			accordion.Items[1].Open = true
 			return accordion, nil
 		}
 
@@ -410,6 +411,7 @@ func NewChatTab(
 				return
 			}
 			newWindow.SetContent(container.NewBorder(searchEntry, nil, nil, nil, accordion))
+			newWindow.Canvas().Focus(searchEntry)
 			newWindow.Show()
 		}
 		searchEntry.OnChanged("")
