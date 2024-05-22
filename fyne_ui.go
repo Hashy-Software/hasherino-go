@@ -331,6 +331,7 @@ func NewChatTab(
 			}
 
 			var images []fyne.CanvasObject
+			var animatedEmotes []*components.EmoteGif
 			mutex := sync.Mutex{}
 
 			fourth := len(emotes) / 4
@@ -359,10 +360,20 @@ func NewChatTab(
 						}
 						mutex.Lock()
 						images = append(images, imgCanvas)
+						if emote.Animated {
+							animatedEmotes = append(animatedEmotes, imgCanvas.(*components.EmoteGif))
+						}
 						mutex.Unlock()
 					}
 				}(emoteSlice)
 			}
+			newWindow.SetOnClosed(func() {
+				for _, emote := range animatedEmotes {
+					go func(emote *components.EmoteGif) {
+						emote.Stop()
+					}(emote)
+				}
+			})
 			wg.Wait()
 			grid := container.NewGridWrap(defaultEmoteSize, images...)
 			stvScroll := container.NewScroll(grid)
@@ -387,9 +398,9 @@ func NewChatTab(
 			// TODO: work for each accordion item
 			start, end := 0, min(60, len(images))
 			for i := start; i < end; i++ {
-				go func() {
+				go func(i int) {
 					images[i].(components.LazyLoadedWidget).LazyLoad()
-				}()
+				}(i)
 			}
 			accordion := widget.NewAccordion(
 				widget.NewAccordionItem("Twitch Emotes", widget.NewLabel("Not implemented")),
