@@ -3,11 +3,11 @@ package components
 import (
 	"bytes"
 	"image"
+	"image/color/palette"
 	"image/draw"
 	"image/gif"
 	"io"
 	"log"
-	"os"
 	"sync"
 	"time"
 
@@ -36,8 +36,6 @@ type EmoteGif struct {
 	lazyLoad      bool
 }
 
-var emptyImageResource = &fyne.StaticResource{StaticName: "empty.png", StaticContent: []byte{}}
-
 // NewEmoteGif creates a new widget loaded to show the specified image resource.
 // If there is an error loading the image it will be returned in the error value.
 // If lazyLoad is true, only load the real image when Start() is called
@@ -48,7 +46,7 @@ func NewEmoteGif(emote *hasherino.Emote, clickCallback func(string) error, lazyL
 	ret.lazyLoad = lazyLoad
 
 	if lazyLoad {
-		return ret, ret.LoadResource(emptyImageResource)
+		return ret, nil
 	}
 
 	res, err := tempFileResource(emote)
@@ -56,51 +54,6 @@ func NewEmoteGif(emote *hasherino.Emote, clickCallback func(string) error, lazyL
 		return ret, err
 	}
 	return ret, ret.LoadResource(res)
-}
-
-func tempFileResource(emote *hasherino.Emote) (*fyne.StaticResource, error) {
-	s, err := os.Stat(emote.TempFile)
-	if err != nil {
-		return nil, err
-	}
-	url, err := emote.GetUrl()
-	if err != nil {
-		return nil, err
-	}
-	// image hasn't been written to tempfile yet
-	if s.Size() == 0 {
-		parsedUri, err := storage.ParseURI(url)
-		if err != nil {
-			return nil, err
-		}
-		read, err := storage.Reader(parsedUri)
-		if err != nil {
-			return nil, err
-		}
-		bytes, err := io.ReadAll(read)
-		if err != nil {
-			return nil, err
-		}
-		err = os.WriteFile(emote.TempFile, bytes, 0666)
-		if err != nil {
-			return nil, err
-		}
-		res := fyne.StaticResource{StaticName: url, StaticContent: bytes}
-		return &res, nil
-	}
-	parsedUri, err := storage.ParseURI("file://" + emote.TempFile)
-	if err != nil {
-		return nil, err
-	}
-	read, err := storage.Reader(parsedUri)
-	if err != nil {
-		return nil, err
-	}
-	bytes, err := io.ReadAll(read)
-	if err != nil {
-		return nil, err
-	}
-	return &fyne.StaticResource{StaticName: url, StaticContent: bytes}, err
 }
 
 // CreateRenderer loads the widget renderer for this widget. This is an internal requirement for Fyne.
@@ -204,6 +157,12 @@ func (g *EmoteGif) draw(dst draw.Image, index int) {
 	}
 }
 
+func (g *EmoteGif) loadEmpty() {
+	g.src.Image = []*image.Paletted{image.NewPaletted(image.Rect(0, 0, 1, 1), palette.Plan9)}
+	g.src.Disposal = []byte{gif.DisposalNone}
+	g.src.LoopCount = -1
+}
+
 // Start begins the animation. The speed of the transition is controlled by the loaded gif file.
 func (g *EmoteGif) Start() {
 	if g.isRunning() {
@@ -213,12 +172,12 @@ func (g *EmoteGif) Start() {
 		res, err := tempFileResource(g.emote)
 		if err != nil {
 			log.Println("Error loading lazy gif", err)
-			g.LoadResource(emptyImageResource)
+			g.loadEmpty()
 		} else {
 			err = g.LoadResource(res)
 			if err != nil {
 				log.Println("Error loading lazy gif", err)
-				g.LoadResource(emptyImageResource)
+				g.loadEmpty()
 			}
 		}
 	}
@@ -246,7 +205,7 @@ func (g *EmoteGif) Start() {
 			for c := range g.src.Image {
 				if g.isStopping() {
 					if g.lazyLoad {
-						g.LoadResource(emptyImageResource)
+						g.loadEmpty()
 					}
 					break loop
 				}
@@ -293,18 +252,14 @@ func (g *EmoteGif) Tapped(event *fyne.PointEvent) {
 	}
 }
 
-func (c *EmoteGif) UpdateVisibility(scrollOffset fyne.Position, scrollSize fyne.Size, containerOffset fyne.Position) {
-	widgetPos := c.Position()
-	widgetSize := c.Size()
+func (c *EmoteGif) LazyLoad() error {
+	c.Start()
+	return nil
+}
 
-	isVisible := widgetPos.Y+widgetSize.Height > scrollOffset.Y &&
-		widgetPos.Y < scrollOffset.Y+scrollSize.Height
-	if isVisible {
-		c.Start()
-	} else {
-		c.Stop()
-	}
-
+func (c *EmoteGif) LazyUnload() error {
+	c.Stop()
+	return nil
 }
 
 func newGif() *EmoteGif {

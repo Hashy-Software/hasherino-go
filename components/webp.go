@@ -2,8 +2,11 @@ package components
 
 import (
 	"bytes"
-	"golang.org/x/image/webp"
+	"image"
 	"io"
+
+	"github.com/Hashy-Software/hasherino-go/hasherino"
+	"golang.org/x/image/webp"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -11,24 +14,29 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// WebpWidget widget shows a Gif image with many frames.
+var emptyImg *image.Image = nil
+
 type WebpWidget struct {
 	widget.BaseWidget
 	min fyne.Size
 
-	dst *canvas.Image
+	dst   *canvas.Image
+	emote *hasherino.Emote
 }
 
-func NewWebpWidget(u fyne.URI) (*WebpWidget, error) {
+func NewWebpWidget(emote *hasherino.Emote) (*WebpWidget, error) {
 	ret := newAnimatedGif()
-
-	return ret, ret.Load(u)
+	ret.loadEmptyDst()
+	ret.emote = emote
+	return ret, nil
 }
 
-func NewWebpWidgetFromResource(r fyne.Resource) (*WebpWidget, error) {
-	ret := newAnimatedGif()
-
-	return ret, ret.LoadResource(r)
+func (g *WebpWidget) loadEmptyDst() {
+	if emptyImg == nil {
+		img := canvas.NewImageFromImage(image.NewNRGBA(image.Rect(0, 0, 1, 1)))
+		emptyImg = &img.Image
+	}
+	g.dst.Image = *emptyImg
 }
 
 func (g *WebpWidget) CreateRenderer() fyne.WidgetRenderer {
@@ -36,9 +44,6 @@ func (g *WebpWidget) CreateRenderer() fyne.WidgetRenderer {
 }
 
 func (g *WebpWidget) Load(u fyne.URI) error {
-	g.dst.Image = nil
-	g.dst.Refresh()
-
 	if u == nil {
 		return nil
 	}
@@ -52,9 +57,6 @@ func (g *WebpWidget) Load(u fyne.URI) error {
 }
 
 func (g *WebpWidget) LoadResource(r fyne.Resource) error {
-	g.dst.Image = nil
-	g.dst.Refresh()
-
 	if r == nil || len(r.Content()) == 0 {
 		return nil
 	}
@@ -109,4 +111,17 @@ func (g *WebpRenderer) Objects() []fyne.CanvasObject {
 
 func (g *WebpRenderer) Refresh() {
 	g.webp.dst.Refresh()
+}
+
+func (g *WebpWidget) LazyLoad() error {
+	res, err := tempFileResource(g.emote)
+	if err != nil {
+		return err
+	}
+	return g.LoadResource(res)
+}
+
+func (g *WebpWidget) LazyUnload() error {
+	g.loadEmptyDst()
+	return nil
 }

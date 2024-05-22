@@ -102,8 +102,8 @@ func (e *Emote) GetUrlExtension() string {
 		if e.Animated {
 			return ".gif"
 		}
-		return ".png"
+		return ".webp"
 	default:
-		return ".png"
+		return ".webp"
 	}
 }
