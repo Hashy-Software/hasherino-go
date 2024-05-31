@@ -25,8 +25,10 @@ import (
 	"github.com/Hashy-Software/hasherino-go/hasherino"
 )
 
-var callbackMap = make(map[string]func(hasherino.ChatMessage))
-var defaultEmoteSize = fyne.NewSize(45, 45)
+var (
+	callbackMap      = make(map[string]func(hasherino.ChatMessage))
+	defaultEmoteSize = fyne.NewSize(45, 45)
+)
 
 func NewSettingsTabs(hc *hasherino.HasherinoController, w fyne.Window) *container.AppTabs {
 	// Accounts tab
@@ -289,7 +291,6 @@ func NewChatTab(
 		for _, msg := range *historyMsgs {
 			callback(msg)
 		}
-
 	}()
 	msgEntry := widget.NewEntry()
 	msgEntry.SetPlaceHolder("Message")
@@ -323,7 +324,6 @@ func NewChatTab(
 		newWindow.SetContent(container.NewCenter(widget.NewLabel("Loading...")))
 
 		loadEmoteSearch := func(search string) (*widget.Accordion, error) {
-
 			emotes, err := getEmotes(search)
 			if err != nil {
 				dialog.ShowError(err, window)
@@ -425,8 +425,8 @@ func NewChatTab(
 			newWindow.Canvas().Focus(searchEntry)
 			newWindow.Show()
 		}
-		searchEntry.OnChanged("")
 
+		searchEntry.OnChanged("")
 	}), msgEntry), nil, nil, messageList)
 	return container.NewTabItem(channel, content)
 }
@@ -461,7 +461,6 @@ func main() {
 			return "", err
 		}
 		return ac.Login, hc.SendMessage(currentTab.Login, message)
-
 	}
 
 	savedTabs, err := hc.GetTabs()
@@ -540,5 +539,4 @@ func main() {
 
 	w.SetContent(components)
 	w.ShowAndRun()
-
 }

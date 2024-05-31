@@ -1,9 +1,12 @@
 package hasherino
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -192,7 +195,6 @@ func (hc *HasherinoController) AddTab(channel string) error {
 		}
 
 		err = hc.AddTempTabs(&[]string{users.Data[0].ID})
-
 		if err != nil {
 			return err
 		}
@@ -200,6 +202,40 @@ func (hc *HasherinoController) AddTab(channel string) error {
 		return nil
 	})
 	return err
+}
+
+type EmojiJsonMap map[string]struct {
+	Name            string `json:"name"`
+	Slug            string `json:"slug"`
+	Group           string `json:"group"`
+	EmojiVersion    string `json:"emoji_version"`
+	UnicodeVersion  string `json:"unicode_version"`
+	SkinToneSupport bool   `json:"skin_tone_support"`
+}
+
+var cachedEmojiJson *EmojiJsonMap
+
+func GetEmojiJSONMap() (*EmojiJsonMap, error) {
+	if cachedEmojiJson != nil {
+		return cachedEmojiJson, nil
+	}
+
+	file, err := os.Open(path.Join("..", "data-by-emoji.json"))
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	bytes, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	var emojiJson EmojiJsonMap
+	err = json.Unmarshal(bytes, &emojiJson)
+	if err != nil {
+		return nil, err
+	}
+	cachedEmojiJson = &emojiJson
+	return &emojiJson, nil
 }
 
 func (hc *HasherinoController) AddTempTabs(channelIds *[]string) error {
@@ -237,6 +273,13 @@ func (hc *HasherinoController) AddTempTabs(channelIds *[]string) error {
 					}
 				}
 			}
+			// Insert emoji
+			// emojiData, err := GetEmojiJSONMap()
+			// if err != nil {
+			// 	log.Println("failed to load emoji data: " + err.Error())
+			// } else {
+			//
+			// }
 
 			// Insert channel 7tv emotes
 			stvUsers := make(map[string]*STVUserJson)
@@ -347,7 +390,6 @@ func (hc *HasherinoController) GetEmotes(search string) ([]*Emote, error) {
 		}
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
