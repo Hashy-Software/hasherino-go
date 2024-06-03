@@ -172,7 +172,7 @@ func (g *EmoteGif) Start() {
 	if g.isRunning() {
 		return
 	}
-	if g.lazyLoad && g.src == nil {
+	if g.lazyLoad {
 		res, err := tempFileResource(g.emote)
 		if err != nil {
 			log.Println("Error loading lazy gif", err)
@@ -294,7 +294,10 @@ func (g *gifRenderer) MinSize() fyne.Size {
 }
 
 func (g *gifRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{g.gif.dst}
+	if g.gif.isRunning() {
+		return []fyne.CanvasObject{g.gif.dst}
+	}
+	return []fyne.CanvasObject{}
 }
 
 func (g *gifRenderer) Refresh() {
