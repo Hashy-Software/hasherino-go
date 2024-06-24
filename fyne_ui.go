@@ -435,6 +435,7 @@ func main() {
 	a := app.New()
 	w := a.NewWindow("hasherino2")
 	w.Resize(fyne.NewSize(600, 800))
+	w.SetMaster()
 
 	hc := &hasherino.HasherinoController{}
 	hc, err := hc.New(callbackMap)
