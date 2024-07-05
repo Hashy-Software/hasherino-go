@@ -27,7 +27,6 @@ func NewTwitchOAuth() *TwitchOAuth {
 
 func (t *TwitchOAuth) IsTokenValid(token string) bool {
 	req, err := http.NewRequest("GET", "https://id.twitch.tv/oauth2/validate", nil)
-
 	if err != nil {
 		log.Printf("Failed to create request for token validation: %s", err)
 		return false
@@ -136,7 +135,7 @@ func (t *TwitchOAuth) ListenForOAuthRedirect(hc *HasherinoController) {
 		}
 
 		w.WriteHeader(200)
-		w.Write([]byte("Account added"))
+		w.Write([]byte("Account added, refresh your accounts list."))
 	})
 
 	err := http.ListenAndServe(":17563", nil)
@@ -185,7 +184,6 @@ func (h *Helix) GetUsers(token string, usernames []string) (*HelixUsers, error) 
 	}
 
 	req, err := http.NewRequest("GET", url+"?"+params, nil)
-
 	if err != nil {
 		log.Printf("Failed to create request for helix users: %s Params: %s", err, params)
 		return nil, err
@@ -214,7 +212,6 @@ func (h *Helix) GetUsers(token string, usernames []string) (*HelixUsers, error) 
 	}
 
 	return &users, nil
-
 }
 
 type ChatMessagesJson struct {
@@ -229,7 +226,6 @@ func GetChatHistory(channel string, limit int) (*[]ChatMessage, error) {
 	url += "?limit=" + strconv.Itoa(limit)
 
 	req, err := http.NewRequest("GET", url, nil)
-
 	if err != nil {
 		log.Printf("Failed to create request for chat history: %s", err)
 		return nil, err
@@ -270,7 +266,6 @@ func GetChatHistory(channel string, limit int) (*[]ChatMessage, error) {
 	}
 
 	return &messages, nil
-
 }
 
 type EmoteSet struct {

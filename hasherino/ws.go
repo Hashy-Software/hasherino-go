@@ -31,7 +31,7 @@ type TwitchChatWebsocket struct {
 func (w *TwitchChatWebsocket) New(token string, user string) (*TwitchChatWebsocket, error) {
 	initial_messages := []string{
 		"CAP REQ :twitch.tv/commands twitch.tv/tags",
-		"PASS oauth:" + token,
+		"PASS " + token,
 		"NICK " + user,
 	}
 	url := "wss://irc-ws.chat.twitch.tv"

@@ -22,13 +22,15 @@ type HasherinoController struct {
 	selectedTab string
 	callbackMap map[string]func(ChatMessage)
 	twitchOAuth *TwitchOAuth
-	chatWS      *TwitchChatWebsocket
+	readWS      *TwitchChatWebsocket
+	writeWS     *TwitchChatWebsocket
 	memDB       *gorm.DB
 	permDB      *gorm.DB
 }
 
 func (hc *HasherinoController) New(callbackMap map[string]func(ChatMessage)) (*HasherinoController, error) {
-	chatWS := &TwitchChatWebsocket{}
+	writeWS := &TwitchChatWebsocket{}
+	readWS := &TwitchChatWebsocket{}
 
 	dataFolder, err := GetDataFolder()
 	if err != nil {
@@ -51,7 +53,8 @@ func (hc *HasherinoController) New(callbackMap map[string]func(ChatMessage)) (*H
 		appId:       "hvmj7blkwy2gw3xf820n47i85g4sub",
 		callbackMap: callbackMap,
 		twitchOAuth: NewTwitchOAuth(),
-		chatWS:      chatWS,
+		readWS:      readWS,
+		writeWS:     writeWS,
 		memDB:       memDB,
 		permDB:      permDB,
 	}
@@ -89,7 +92,7 @@ func (hc *HasherinoController) RemoveAccount(id string) error {
 			return result.Error
 		}
 		if account.Active {
-			hc.chatWS.Close()
+			hc.writeWS.Close()
 		}
 		result = tx.Delete(&account)
 		if result.Error != nil {
@@ -135,8 +138,8 @@ func (hc *HasherinoController) SetActiveAccount(id string) error {
 			return result.Error
 		}
 
-		if hc.chatWS != nil {
-			hc.chatWS.Close()
+		if hc.writeWS != nil {
+			hc.writeWS.Close()
 		}
 		go hc.Listen()
 
@@ -162,21 +165,21 @@ func (hc *HasherinoController) OpenOAuthPage() {
 
 func (hc *HasherinoController) AddTab(channel string) error {
 	err := hc.permDB.Transaction(func(tx *gorm.DB) error {
+		_, exists := hc.readWS.channels[channel]
+		if exists {
+			return errors.New("already joined channel " + channel)
+		}
+
 		activeAccount := &Account{}
 		result := hc.permDB.Take(&activeAccount, "Active = ?", true)
 		if result.Error != nil {
-			return errors.New("No active account")
-		}
-
-		_, exists := hc.chatWS.channels[channel]
-		if exists {
-			return errors.New("Already joined channel " + channel)
+			return errors.New("no active account")
 		}
 
 		helix := NewHelix(hc.appId)
 		users, err := helix.GetUsers(activeAccount.Token, []string{channel})
 		if err != nil || len(users.Data) != 1 {
-			return errors.New("Failed to obtain channel's id and login")
+			return errors.New("failed to obtain channel's id and login")
 		}
 
 		tab := &Tab{
@@ -188,10 +191,10 @@ func (hc *HasherinoController) AddTab(channel string) error {
 
 		result = tx.Create(&tab)
 
-		err = hc.chatWS.Join(channel)
+		err = hc.readWS.Join(channel)
 		if err != nil {
-			log.Printf("Failed to join channel %s: %s", channel, err)
-			return errors.New("Failed to join channel " + channel)
+			log.Printf("failed to join channel %s: %s", channel, err)
+			return errors.New("failed to join channel " + channel)
 		}
 
 		err = hc.AddTempTabs(&[]string{users.Data[0].ID})
@@ -401,7 +404,7 @@ func (hc *HasherinoController) RemoveTab(id string) error {
 		tab := &Tab{}
 		result := tx.Take(&tab, "Id = ?", id)
 		if result.Error != nil {
-			return errors.New("Tab not found for id " + id)
+			return errors.New("tab not found for id " + id)
 		}
 
 		result = tx.Delete(&tab)
@@ -414,9 +417,9 @@ func (hc *HasherinoController) RemoveTab(id string) error {
 			return result.Error
 		}
 
-		err := hc.chatWS.Part(tab.Login)
+		err := hc.readWS.Part(tab.Login)
 		if err != nil {
-			return errors.New("Failed to part channel" + tab.Login)
+			return errors.New("failed to part channel" + tab.Login)
 		}
 
 		return nil
@@ -468,15 +471,24 @@ func (hc *HasherinoController) GetSelectedTab() (*Tab, error) {
 
 func (hc *HasherinoController) Listen() error {
 	activeAccount, err := hc.GetActiveAccount()
-	if err != nil {
-		return err
+	if err == nil {
+		if hc.writeWS == nil || hc.writeWS.State == Disconnected {
+			hc.writeWS, err = hc.writeWS.New("oauth:"+activeAccount.Token, activeAccount.Login)
+			if err != nil {
+				return err
+			}
+			err = hc.writeWS.Connect()
+			if err != nil {
+				return err
+			}
+		}
 	}
-	if hc.chatWS == nil || hc.chatWS.State == Disconnected {
-		hc.chatWS, err = hc.chatWS.New(activeAccount.Token, activeAccount.Login)
+	if hc.readWS == nil || hc.readWS.State == Disconnected {
+		hc.readWS, err = hc.readWS.New("SCHMOOPIIE", "justinfan71097")
 		if err != nil {
 			return err
 		}
-		err = hc.chatWS.Connect()
+		err = hc.readWS.Connect()
 		if err != nil {
 			return err
 		}
@@ -498,27 +510,27 @@ func (hc *HasherinoController) Listen() error {
 	}
 
 	for channel := range hc.callbackMap {
-		_, joinedChannel := hc.chatWS.channels[channel]
+		_, joinedChannel := hc.writeWS.channels[channel]
 		if !joinedChannel {
-			hc.chatWS.Join(channel)
+			hc.readWS.Join(channel)
 		}
 	}
 
-	go hc.chatWS.Listen(callbackWrapper)
+	go hc.readWS.Listen(callbackWrapper)
 	return nil
 }
 
 func (hc *HasherinoController) IsChannelJoined(channel string) bool {
-	if hc.chatWS == nil || hc.chatWS.State == Disconnected {
+	if hc.readWS == nil || hc.readWS.State == Disconnected {
 		return false
 	}
 
-	_, joinedChannel := hc.chatWS.channels[channel]
+	_, joinedChannel := hc.readWS.channels[channel]
 	return joinedChannel
 }
 
 func (hc *HasherinoController) SendMessage(channel string, message string) error {
-	err := hc.chatWS.Send(channel, message)
+	err := hc.writeWS.Send(channel, message)
 	return err
 }
 

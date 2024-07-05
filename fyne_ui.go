@@ -232,7 +232,7 @@ func NewEmoteCanvasObject(emote *hasherino.Emote) (*fyne.CanvasObject, error) {
 
 func NewChatTab(
 	channel string,
-	sendMsg func(string) (string, error),
+	sendMsg func(string) error,
 	getEmotes func(string) ([]*hasherino.Emote, error),
 	window fyne.Window,
 	settingsFunc func() (*hasherino.AppSettings, error),
@@ -307,14 +307,13 @@ func NewChatTab(
 			return
 		}
 
-		author, err := sendMsg(text)
+		err = sendMsg(text)
 		if err != nil {
 			dialog.ShowError(err, window)
 			return
 		}
 
 		msgEntry.SetText("")
-		data = append(data, author+": "+text)
 		messageList.ScrollToBottom()
 		messageList.Refresh()
 	}
@@ -449,19 +448,16 @@ func main() {
 		chatTabs.Refresh()
 	}
 
-	sendMessage := func(message string) (string, error) {
+	sendMessage := func(message string) error {
 		currentTab, err := hc.GetSelectedTab()
 		if err != nil {
-			return "", err
+			return err
 		}
-		if !hc.IsChannelJoined(currentTab.Login) {
-			return "", errors.New("Channel not joined. Please make sure you have an active account on settings.")
-		}
-		ac, err := hc.GetActiveAccount()
+		_, err = hc.GetActiveAccount()
 		if err != nil {
-			return "", err
+			return err
 		}
-		return ac.Login, hc.SendMessage(currentTab.Login, message)
+		return hc.SendMessage(currentTab.Login, message)
 	}
 
 	savedTabs, err := hc.GetTabs()
